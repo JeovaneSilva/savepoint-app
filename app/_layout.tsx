@@ -42,11 +42,9 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="jogo/[id]" />
       </Stack.Protected>
-      {/* Signed-out area */}
-      <Stack.Protected guard={!user}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="auth" />
-      </Stack.Protected>
+      {/* Public screens: always registered, they redirect to the library when a session exists. */}
+      <Stack.Screen name="index" />
+      <Stack.Screen name="auth" />
     </Stack>
   );
 }
