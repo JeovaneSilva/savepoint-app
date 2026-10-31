@@ -15,7 +15,10 @@ Escaneie o QR code com o **Expo Go** ou use `npm run android` / `npm run ios` / 
 
 ## Backend (Supabase)
 
-1. **Tabela:** rode `supabase/migrations/0000_init_user_games.sql` no SQL Editor.
+1. **Tabelas e funções:** rode no SQL Editor, em ordem:
+   - `supabase/migrations/0000_init_user_games.sql` (biblioteca)
+   - `supabase/migrations/0001_rawg_cache.sql` (cache da RAWG e contador mensal)
+   - `supabase/migrations/0002_profiles_ranking.sql` (apelidos e ranking)
 2. **Busca de jogos:** a chave da RAWG fica numa Edge Function, nunca no app.
 
 ```bash

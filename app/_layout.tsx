@@ -38,6 +38,7 @@ function RootNavigator() {
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="jogo/[id]" />
+        <Stack.Screen name="apelido" />
       </Stack.Protected>
       {/* Public screens: always registered, they redirect to the library when a session exists. */}
       <Stack.Screen name="index" />

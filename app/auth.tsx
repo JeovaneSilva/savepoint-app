@@ -12,6 +12,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { H2, Text } from "@/components/ui/Text";
 import { toast } from "@/components/ui/Toast";
 import { useAuth } from "@/hooks/use-auth";
+import { NICKNAME_HINT, isNicknameAvailable, validateNickname } from "@/lib/nickname";
 import { supabase } from "@/lib/supabase";
 import { colors, shadowCard } from "@/theme";
 
@@ -69,6 +70,7 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [nickname, setNickname] = useState("");
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
@@ -80,8 +82,19 @@ export default function AuthScreen() {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
+    if (mode === "signup") {
+      const nickError = validateNickname(nickname);
+      if (nickError) {
+        toast.error(nickError);
+        return;
+      }
+    }
     setBusy(true);
     try {
+      if (mode === "signup" && !(await isNicknameAvailable(nickname))) {
+        toast.error("Esse apelido já está em uso. Escolha outro.");
+        return;
+      }
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword(parsed.data);
         if (error) {
@@ -90,7 +103,11 @@ export default function AuthScreen() {
         }
         toast.success("Bem-vindo de volta, player!");
       } else {
-        const { data, error } = await supabase.auth.signUp(parsed.data);
+        const { data, error } = await supabase.auth.signUp({
+          ...parsed.data,
+          // A database trigger turns this into the profile (the nickname shown in the ranking).
+          options: { data: { nickname: nickname.trim() } },
+        });
         if (error) {
           toast.error(describeAuthError(error, "signup"));
           return;
@@ -140,6 +157,22 @@ export default function AuthScreen() {
                   ]}
                 />
                 <Card style={{ padding: 24, gap: 18, ...shadowCard }}>
+                  {mode === "signup" && (
+                    <View>
+                      <Label>Apelido (aparece no ranking)</Label>
+                      <Input
+                        value={nickname}
+                        onChangeText={setNickname}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={20}
+                        returnKeyType="next"
+                      />
+                      <Text muted style={{ fontSize: 12, marginTop: 6 }}>
+                        {NICKNAME_HINT}
+                      </Text>
+                    </View>
+                  )}
                   <View>
                     <Label>Email</Label>
                     <Input

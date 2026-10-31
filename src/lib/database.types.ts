@@ -68,12 +68,46 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          nickname: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          nickname: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          nickname?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_ranking: {
+        Args: { p_year: number }
+        Returns: {
+          nickname: string
+          completed_total: number
+          completed_year: number
+          library_total: number
+          is_me: boolean
+        }[]
+      }
+      nickname_available: {
+        Args: { p_nickname: string }
+        Returns: boolean
+      }
     }
     Enums: {
       game_status: "concluido" | "jogando" | "quero_jogar" | "abandonado"
