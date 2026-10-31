@@ -11,7 +11,10 @@ if (!url || !key) {
   throw new Error("Defina EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_KEY no arquivo .env");
 }
 
-export const supabase = createClient<Database>(url, key, {
+// Accept the URL copied with extra path parts (e.g. ".../rest/v1/"): the client wants only the origin.
+const origin = new URL(url).origin;
+
+export const supabase = createClient<Database>(origin, key, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
