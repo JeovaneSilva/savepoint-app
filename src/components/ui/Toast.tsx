@@ -28,7 +28,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }).start();
       timer.current = setTimeout(() => {
         Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setItem(null));
-      }, 2800);
+      }, 5500);
     },
     [opacity],
   );

@@ -1,6 +1,7 @@
 import { useRef, useState, type ComponentRef } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from "react-native";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
+import { AuthRetryableFetchError, AuthWeakPasswordError, type AuthError } from "@supabase/supabase-js";
 import { MailCheck } from "lucide-react-native";
 import { z } from "zod";
 import { Backdrop } from "@/components/Screen";
@@ -10,6 +11,7 @@ import { Input, Label } from "@/components/ui/Input";
 import { Tabs } from "@/components/ui/Tabs";
 import { H2, Text } from "@/components/ui/Text";
 import { toast } from "@/components/ui/Toast";
+import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/lib/supabase";
 import { colors, shadowCard } from "@/theme";
 
@@ -18,6 +20,51 @@ const credsSchema = z.object({
   password: z.string().min(6, "A senha precisa de pelo menos 6 caracteres").max(72),
 });
 
+const WEAK_REASON: Record<string, string> = {
+  length: "tamanho mínimo",
+  characters: "letras maiúsculas, minúsculas, números e símbolos",
+  pwned: "senha já vazada em listas públicas",
+};
+
+/** Turns a Supabase auth error into a specific, actionable message (and logs the raw error). */
+function describeAuthError(error: AuthError, mode: "login" | "signup"): string {
+  console.warn("[auth]", mode, error.name, error.status, error.code, error.message);
+  const msg = error.message ?? "";
+  const code = error.code ?? "";
+
+  if (error instanceof AuthWeakPasswordError || code === "weak_password") {
+    const reasons = error instanceof AuthWeakPasswordError ? error.reasons : [];
+    const detail = reasons.map((r) => WEAK_REASON[r] ?? r).join(", ");
+    return `Senha fraca${detail ? ` (exigido: ${detail})` : ""}. ${msg}`.trim();
+  }
+  if (error instanceof AuthRetryableFetchError || /network request failed|failed to fetch/i.test(msg)) {
+    return "Sem conexão com o Supabase. Confira a internet e a EXPO_PUBLIC_SUPABASE_URL no .env (reinicie o Expo após mudar).";
+  }
+  if (/invalid api key|apikey/i.test(msg) || error.status === 401) {
+    return "Chave do Supabase inválida. Confira a EXPO_PUBLIC_SUPABASE_KEY no .env (reinicie o Expo após mudar).";
+  }
+  switch (code) {
+    case "user_already_exists":
+    case "email_exists":
+      return "Esse email já tem conta. Use a aba Entrar.";
+    case "email_not_confirmed":
+      return "Confirme seu email antes de entrar (veja a caixa de entrada e o spam).";
+    case "invalid_credentials":
+      return "Email ou senha incorretos.";
+    case "email_address_invalid":
+      return "O Supabase recusou esse email. Tente outro endereço.";
+    case "signup_disabled":
+      return "Cadastros estão desativados no projeto (Authentication → Sign In / Providers).";
+    case "over_email_send_rate_limit":
+    case "over_request_rate_limit":
+      return "Muitas tentativas ou emails enviados. Aguarde alguns minutos e tente de novo.";
+  }
+  if (/already registered/i.test(msg)) return "Esse email já tem conta. Use a aba Entrar.";
+  if (/invalid login credentials/i.test(msg)) return "Email ou senha incorretos.";
+  if (/not confirmed/i.test(msg)) return "Confirme seu email antes de entrar.";
+  return `${mode === "login" ? "Não foi possível entrar" : "Não foi possível criar a conta"}: ${msg || code || "erro desconhecido"}`;
+}
+
 export default function AuthScreen() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -25,6 +72,7 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const { user } = useAuth();
 
   async function submit() {
     const parsed = credsSchema.safeParse({ email, password });
@@ -37,16 +85,14 @@ export default function AuthScreen() {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword(parsed.data);
         if (error) {
-          toast.error(
-            error.message.includes("Email not confirmed") ? "Confirme seu email antes de entrar" : "Email ou senha incorretos",
-          );
+          toast.error(describeAuthError(error, "login"));
           return;
         }
         toast.success("Bem-vindo de volta, player!");
       } else {
         const { data, error } = await supabase.auth.signUp(parsed.data);
         if (error) {
-          toast.error(error.message.includes("registered") ? "Esse email já tem conta" : "Não foi possível criar a conta");
+          toast.error(describeAuthError(error, "signup"));
           return;
         }
         if (!data.session) setSentTo(parsed.data.email);
@@ -55,6 +101,8 @@ export default function AuthScreen() {
       setBusy(false);
     }
   }
+
+  if (user) return <Redirect href="/biblioteca" />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
