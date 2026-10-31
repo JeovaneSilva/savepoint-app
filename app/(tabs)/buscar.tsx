@@ -110,6 +110,12 @@ export default function BuscarScreen() {
           title="A busca ainda não está ativada"
           text="Falta conectar a chave da base de jogos. Assim que ela for adicionada, a busca funciona aqui."
         />
+      ) : error === "quota" ? (
+        <EmptyState
+          icon={<Ghost size={40} color={colors.statusWant} />}
+          title="Limite mensal da base de jogos atingido"
+          text="Novas buscas voltam no mês que vem. Jogos já consultados continuam disponíveis."
+        />
       ) : failed ? (
         <EmptyState
           icon={<Ghost size={40} color={colors.destructive} />}

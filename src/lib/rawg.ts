@@ -5,10 +5,13 @@ export type SearchResponse = {
   results: GameSummary[];
   hasMore: boolean;
   count: number;
-  error?: "missing_key" | "unavailable";
+  error?: "missing_key" | "quota" | "unavailable";
 };
 
-export type DetailsResponse = { game: GameDetails | null; error?: "missing_key" | "not_found" | "unavailable" };
+export type DetailsResponse = {
+  game: GameDetails | null;
+  error?: "missing_key" | "not_found" | "quota" | "unavailable";
+};
 
 /** Search games through the `rawg` Edge Function (the RAWG key stays server-side). */
 export async function searchGames(filters: SearchFilters): Promise<SearchResponse> {
@@ -25,4 +28,12 @@ export async function getGameDetails(id: number): Promise<DetailsResponse> {
   });
   if (error || !data) return { game: null, error: "unavailable" };
   return data;
+}
+
+/** Cover + basic info only (1 RAWG request, shared cache). Used by the importer. */
+export async function getGameCover(id: number): Promise<GameSummary | null> {
+  const { data, error } = await supabase.functions.invoke<{ game: GameSummary | null }>("rawg", {
+    body: { action: "cover", id },
+  });
+  return error || !data ? null : data.game;
 }
