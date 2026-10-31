@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, View } from "react-native";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ghost, Pencil, Trophy } from "lucide-react-native";
+import { Avatar } from "@/components/Avatar";
 import { Backdrop } from "@/components/Screen";
 import { EmptyState } from "@/components/Brand";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +17,8 @@ type Mode = "total" | "year";
 
 interface Row {
   nickname: string;
+  avatar_path: string | null;
+  avatar_updated_at: string | null;
   completed_total: number;
   completed_year: number;
   library_total: number;
@@ -136,7 +139,14 @@ export default function RankingScreen() {
 function RankRow({ item, max }: { item: Ranked; max: number }) {
   const medal = item.rank <= 3 && item.value > 0 ? MEDAL[item.rank - 1] : undefined;
   return (
-    <View
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir perfil de ${item.nickname}`}
+      onPress={() =>
+        item.is_me
+          ? router.push("/meu-perfil")
+          : router.push({ pathname: "/perfil/[nickname]", params: { nickname: item.nickname } })
+      }
       style={[
         {
           flexDirection: "row",
@@ -172,6 +182,8 @@ function RankRow({ item, max }: { item: Ranked; max: number }) {
         )}
       </View>
 
+      <Avatar nickname={item.nickname} path={item.avatar_path} version={item.avatar_updated_at} size={38} ring={item.is_me} />
+
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text weight="semibold" numberOfLines={1} style={{ flexShrink: 1, fontSize: 15 }}>
@@ -202,6 +214,6 @@ function RankRow({ item, max }: { item: Ranked; max: number }) {
           {item.value === 1 ? "zerado" : "zerados"}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }

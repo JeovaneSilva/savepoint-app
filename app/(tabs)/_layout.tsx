@@ -1,8 +1,10 @@
-import { ActivityIndicator, View } from "react-native";
-import { Redirect, Tabs } from "expo-router";
+import { ActivityIndicator, Pressable, View } from "react-native";
+import { Redirect, Tabs, router } from "expo-router";
 import { BarChart3, Library, LogOut, Search, Trophy } from "lucide-react-native";
+import { Avatar } from "@/components/Avatar";
 import { Logo } from "@/components/Brand";
 import { Button } from "@/components/ui/Button";
+import { useBadgeWatcher } from "@/hooks/use-badges";
 import { useSignOut } from "@/hooks/use-auth";
 import { useProfile } from "@/hooks/use-profile";
 import { alpha, colors, fonts } from "@/theme";
@@ -12,6 +14,7 @@ export const unstable_settings = { initialRouteName: "biblioteca" };
 export default function TabsLayout() {
   const signOut = useSignOut();
   const { data: profile, isPending } = useProfile();
+  useBadgeWatcher();
 
   if (isPending) {
     return (
@@ -31,14 +34,20 @@ export default function TabsLayout() {
         headerTitleAlign: "left",
         headerTitle: () => <Logo size={22} />,
         headerRight: () => (
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel="Sair"
-            icon={<LogOut size={20} color={colors.foreground} />}
-            onPress={signOut}
-            style={{ marginRight: 8 }}
-          />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+            {profile && (
+              <Pressable accessibilityLabel="Meu perfil" onPress={() => router.push("/meu-perfil")} hitSlop={8}>
+                <Avatar nickname={profile.nickname} path={profile.avatar_path} version={profile.avatar_updated_at} size={32} ring />
+              </Pressable>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              accessibilityLabel="Sair"
+              icon={<LogOut size={20} color={colors.foreground} />}
+              onPress={signOut}
+            />
+          </View>
         ),
         sceneStyle: { backgroundColor: colors.background },
         tabBarActiveTintColor: colors.primary,

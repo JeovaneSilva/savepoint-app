@@ -37,6 +37,12 @@
           "resizeMode": "contain",
           "backgroundColor": "#070711"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O SavePoint precisa acessar suas fotos para você escolher a foto de perfil."
+        }
       ]
     ],
     "experiments": {

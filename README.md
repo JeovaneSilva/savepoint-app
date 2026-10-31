@@ -20,6 +20,8 @@ Escaneie o QR code com o **Expo Go** ou use `npm run android` / `npm run ios` / 
    - `supabase/migrations/0001_rawg_cache.sql` (cache da RAWG e contador mensal)
    - `supabase/migrations/0002_profiles_ranking.sql` (apelidos e ranking)
    - `supabase/migrations/0003_hours_unknown_date.sql` (horas para zerar e "não lembro quando zerei")
+   - `supabase/migrations/0004_badges_profiles.sql` (selos, foto de perfil e perfis públicos)
+   - `supabase/migrations/0005_avatars_read_policy.sql` (permite substituir a foto de perfil)
 2. **Busca de jogos:** a chave da RAWG fica numa Edge Function, nunca no app.
 
 ```bash

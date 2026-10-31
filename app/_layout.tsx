@@ -39,6 +39,8 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="jogo/[id]" />
         <Stack.Screen name="apelido" />
+        <Stack.Screen name="meu-perfil" />
+        <Stack.Screen name="perfil/[nickname]" />
       </Stack.Protected>
       {/* Public screens: always registered, they redirect to the library when a session exists. */}
       <Stack.Screen name="index" />

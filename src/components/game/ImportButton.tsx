@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { H2, Text } from "@/components/ui/Text";
 import { toast } from "@/components/ui/Toast";
-import { libraryQuery } from "@/hooks/use-library";
+import { invalidateDerived, libraryQuery } from "@/hooks/use-library";
 import { parseImport, type ImportRow } from "@/lib/import";
 import { getGameCover } from "@/lib/rawg";
 import { supabase } from "@/lib/supabase";
@@ -110,7 +110,7 @@ export function ImportButton({ variant = "outline" }: { variant?: "outline" | "n
         setPhase({ step: "working", label: "Salvando na biblioteca…", done: Math.min(i + CHUNK, rows.length), total: rows.length });
       }
 
-      await qc.invalidateQueries({ queryKey: ["library"] });
+      invalidateDerived(qc);
       setPhase({ step: "done", imported, existing, invalid: parsed.invalid + (rows.length - imported), noCover });
     } catch {
       setPhase({ step: "idle" });

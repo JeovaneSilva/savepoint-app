@@ -3,6 +3,14 @@ import { toast } from "@/components/ui/Toast";
 import { supabase } from "@/lib/supabase";
 import type { UserGame, UserGameInsert, UserGameUpdate } from "@/lib/games";
 
+/** Library changes can unlock badges and move the ranking / public profile numbers. */
+export function invalidateDerived(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["library"] });
+  qc.invalidateQueries({ queryKey: ["badges"] });
+  qc.invalidateQueries({ queryKey: ["ranking"] });
+  qc.invalidateQueries({ queryKey: ["public-profile"] });
+}
+
 export const libraryQuery = queryOptions({
   queryKey: ["library"],
   queryFn: async (): Promise<UserGame[]> => {
@@ -33,7 +41,7 @@ export function useAddGame() {
       return data;
     },
     onSuccess: (g) => {
-      qc.invalidateQueries({ queryKey: ["library"] });
+      invalidateDerived(qc);
       toast.success(`${g.name} adicionado à sua biblioteca`);
     },
     onError: (e: { code?: string }) => {
@@ -51,7 +59,7 @@ export function useUpdateGame() {
       return data;
     },
     onSuccess: (g) => {
-      qc.invalidateQueries({ queryKey: ["library"] });
+      invalidateDerived(qc);
       toast.success(`${g.name} atualizado`);
     },
     onError: () => toast.error("Não foi possível salvar as alterações"),
@@ -67,7 +75,7 @@ export function useRemoveGame() {
       return game;
     },
     onSuccess: (g) => {
-      qc.invalidateQueries({ queryKey: ["library"] });
+      invalidateDerived(qc);
       toast.success(`${g.name} removido da lista`);
     },
     onError: () => toast.error("Não foi possível remover o jogo"),

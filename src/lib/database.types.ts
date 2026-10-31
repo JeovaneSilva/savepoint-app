@@ -76,18 +76,24 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_path: string | null
+          avatar_updated_at: string | null
           created_at: string
           nickname: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          avatar_path?: string | null
+          avatar_updated_at?: string | null
           created_at?: string
           nickname: string
           updated_at?: string
           user_id?: string
         }
         Update: {
+          avatar_path?: string | null
+          avatar_updated_at?: string | null
           created_at?: string
           nickname?: string
           updated_at?: string
@@ -100,10 +106,59 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_my_badges: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          name: string
+          description: string
+          icon: string
+          tier: string
+          threshold: number
+          progress: number
+          earned_at: string | null
+        }[]
+      }
+      get_profile: {
+        Args: { p_nickname: string }
+        Returns: {
+          nickname: string
+          avatar_path: string | null
+          avatar_updated_at: string | null
+          member_since: string
+          completed_total: number
+          hours_total: number
+          library_total: number
+          badges_total: number
+          is_me: boolean
+        }[]
+      }
+      get_profile_badges: {
+        Args: { p_nickname: string }
+        Returns: {
+          id: string
+          name: string
+          description: string
+          icon: string
+          tier: string
+          earned_at: string
+        }[]
+      }
+      get_profile_recent: {
+        Args: { p_nickname: string }
+        Returns: {
+          rawg_id: number
+          name: string
+          cover_url: string | null
+          completed_at: string | null
+        }[]
+      }
       get_ranking: {
         Args: { p_year: number }
         Returns: {
           nickname: string
+          avatar_path: string | null
+          avatar_updated_at: string | null
           completed_total: number
           completed_year: number
           library_total: number
