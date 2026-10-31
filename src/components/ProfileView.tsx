@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowLeft, Camera, Clock, Medal, Pencil, Trash2, Trophy, UserRound } from "lucide-react-native";
+import { ArrowLeft, Camera, Clock, Medal, Pencil, ShieldCheck, Trash2, Trophy, UserRound } from "lucide-react-native";
 import { Avatar } from "@/components/Avatar";
 import { BadgeMedal, type BadgeInfo } from "@/components/BadgeMedal";
 import { Card, EmptyState } from "@/components/Brand";
@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { H1, H2, Text } from "@/components/ui/Text";
 import { GameCover } from "@/components/game/GameCover";
 import { useMyBadges, usePublicBadges, usePublicProfile, useRecentCompleted } from "@/hooks/use-badges";
+import { useAccountStatus, usePendingCount } from "@/hooks/use-account";
 import { useChangeAvatar, useRemoveAvatar } from "@/hooks/use-profile";
 import { alpha, colors, radius, shadowCard } from "@/theme";
 
@@ -30,6 +31,10 @@ export function ProfileView({ nickname }: { nickname: string }) {
   const myBadges = useMyBadges();
   const theirBadges = usePublicBadges(nickname, !!p && !isMe);
   const recent = useRecentCompleted(nickname, !!p);
+
+  const account = useAccountStatus();
+  const isAdmin = !!account.data?.is_admin;
+  const pendingAccounts = usePendingCount(isAdmin);
 
   const changeAvatar = useChangeAvatar();
   const removeAvatar = useRemoveAvatar();
@@ -149,6 +154,16 @@ export function ProfileView({ nickname }: { nickname: string }) {
                   >
                     Alterar apelido
                   </Button>
+                  {isAdmin && (
+                    <Button
+                      variant={pendingAccounts > 0 ? "neon" : "outline"}
+                      size="sm"
+                      icon={<ShieldCheck size={14} color={pendingAccounts > 0 ? colors.primaryForeground : colors.foreground} />}
+                      onPress={() => router.push("/aprovacoes")}
+                    >
+                      {pendingAccounts > 0 ? `Aprovar contas (${pendingAccounts})` : "Aprovar contas"}
+                    </Button>
+                  )}
                 </View>
               )}
             </View>

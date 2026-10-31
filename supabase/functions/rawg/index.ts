@@ -7,6 +7,8 @@
 //   function only answers from cache and reports error "quota".
 // - If the cache tables are missing, the function still works (just without caching/counting).
 // - verify_jwt is on by default, so only signed-in users can call it.
+// - Only APPROVED accounts (see migrations/0007_account_approval.sql) may use it, so a pending or blocked
+//   account can't spend the RAWG quota. (If that table doesn't exist yet, the check is skipped.)
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -137,6 +139,44 @@ function errorCode(e: unknown): "missing_key" | "not_found" | "quota" | "unavail
   return "unavailable";
 }
 
+/* ---------------- Account approval ---------------- */
+
+const approvalCache = new Map<string, { ok: boolean; at: number }>();
+const APPROVAL_TTL_MS = 60_000;
+
+/** Is the caller's account approved? Looks the user up from the JWT (already verified by the gateway). */
+async function isApproved(req: Request): Promise<boolean> {
+  if (!admin) return true; // can't check: don't lock everyone out
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return false;
+  try {
+    const { data, error } = await admin.auth.getUser(token);
+    if (error || !data.user) return false;
+    const id = data.user.id;
+
+    const hit = approvalCache.get(id);
+    if (hit && Date.now() - hit.at < APPROVAL_TTL_MS) return hit.ok;
+
+    const { data: row, error: dbError } = await admin
+      .from("account_approvals")
+      .select("status")
+      .eq("user_id", id)
+      .maybeSingle();
+    if (dbError) {
+      // Migration 0007 not applied yet: keep working. Any other DB error: stay closed.
+      if (dbError.code === "42P01" || dbError.code === "PGRST205") return true;
+      console.warn("[rawg] approval lookup failed", dbError.message);
+      return false;
+    }
+    const ok = row?.status === "approved";
+    approvalCache.set(id, { ok, at: Date.now() });
+    return ok;
+  } catch (e) {
+    console.warn("[rawg] approval check failed", e);
+    return false;
+  }
+}
+
 /* ---------------- Handlers ---------------- */
 
 // Only these query params are forwarded to RAWG /games.
@@ -157,6 +197,8 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: "bad_request" }, 400);
   }
+
+  if (!(await isApproved(req))) return json({ error: "not_approved" }, 403);
 
   void maybeCleanup();
 

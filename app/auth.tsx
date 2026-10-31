@@ -1,10 +1,11 @@
 import { useRef, useState, type ComponentRef } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from "react-native";
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import { AuthRetryableFetchError, AuthWeakPasswordError, type AuthError } from "@supabase/supabase-js";
 import { MailCheck } from "lucide-react-native";
 import { z } from "zod";
 import { Backdrop } from "@/components/Screen";
+import { SignedInRedirect } from "@/components/SignedInRedirect";
 import { Card, Logo, RawgAttribution } from "@/components/Brand";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
@@ -119,7 +120,7 @@ export default function AuthScreen() {
     }
   }
 
-  if (user) return <Redirect href="/biblioteca" />;
+  if (user) return <SignedInRedirect />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -202,6 +203,10 @@ export default function AuthScreen() {
                   <Button variant="neon" fullWidth loading={busy} onPress={submit}>
                     {busy ? "Carregando…" : mode === "login" ? "Entrar" : "Criar conta"}
                   </Button>
+
+                  <Text muted style={{ fontSize: 12, textAlign: "center", lineHeight: 17 }}>
+                    Novas contas só entram depois de aprovadas pelo administrador.
+                  </Text>
                 </Card>
               </View>
             )}

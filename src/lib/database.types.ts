@@ -106,6 +106,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_accounts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          user_id: string
+          email: string
+          nickname: string | null
+          created_at: string
+          status: string
+        }[]
+      }
+      admin_set_status: {
+        Args: { p_user: string; p_status: string }
+        Returns: undefined
+      }
+      get_my_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          status: string
+          is_admin: boolean
+        }[]
+      }
       get_my_badges: {
         Args: Record<PropertyKey, never>
         Returns: {

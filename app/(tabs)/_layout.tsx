@@ -4,6 +4,7 @@ import { BarChart3, Library, LogOut, Search, Trophy } from "lucide-react-native"
 import { Avatar } from "@/components/Avatar";
 import { Logo } from "@/components/Brand";
 import { Button } from "@/components/ui/Button";
+import { useAccountStatus, usePendingCount } from "@/hooks/use-account";
 import { useBadgeWatcher } from "@/hooks/use-badges";
 import { useSignOut } from "@/hooks/use-auth";
 import { useProfile } from "@/hooks/use-profile";
@@ -15,6 +16,8 @@ export default function TabsLayout() {
   const signOut = useSignOut();
   const { data: profile, isPending } = useProfile();
   useBadgeWatcher();
+  const account = useAccountStatus();
+  const pendingAccounts = usePendingCount(!!account.data?.is_admin);
 
   if (isPending) {
     return (
@@ -38,6 +41,21 @@ export default function TabsLayout() {
             {profile && (
               <Pressable accessibilityLabel="Meu perfil" onPress={() => router.push("/meu-perfil")} hitSlop={8}>
                 <Avatar nickname={profile.nickname} path={profile.avatar_path} version={profile.avatar_updated_at} size={32} ring />
+                {pendingAccounts > 0 && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -2,
+                      right: -2,
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: colors.destructive,
+                      borderWidth: 2,
+                      borderColor: colors.background,
+                    }}
+                  />
+                )}
               </Pressable>
             )}
             <Button

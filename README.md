@@ -23,6 +23,7 @@ Escaneie o QR code com o **Expo Go** ou use `npm run android` / `npm run ios` / 
    - `supabase/migrations/0004_badges_profiles.sql` (selos, foto de perfil e perfis públicos)
    - `supabase/migrations/0005_avatars_read_policy.sql` (permite substituir a foto de perfil)
    - `supabase/migrations/0006_harder_badges.sql` (quadro de selos mais difícil; recalcula todos os selos)
+   - `supabase/migrations/0007_account_approval.sql` (aprovação manual de contas)
 2. **Busca de jogos:** a chave da RAWG fica numa Edge Function, nunca no app.
 
 ```bash
@@ -34,6 +35,22 @@ supabase functions deploy rawg
 ```
 
 Chave gratuita da RAWG: https://rawg.io/apidocs
+
+## Aprovação de contas
+
+Toda conta nova nasce **pendente**: o app mostra "aguardando aprovação" e o banco não entrega nenhum dado
+(nem a busca da RAWG responde) até um administrador aprovar.
+
+1. Rode a migration `0007`. Quem já tinha conta é aprovado automaticamente.
+2. Torne-se administrador (uma vez), trocando o email:
+   ```sql
+   INSERT INTO public.app_admins (user_id)
+   SELECT id FROM auth.users WHERE email = 'SEU_EMAIL_AQUI' ON CONFLICT DO NOTHING;
+   ```
+3. Publique de novo a Edge Function `rawg` (ela agora confere a aprovação).
+4. No app: **Meu perfil → Aprovar contas** (um ponto vermelho no seu avatar avisa quando há pendências).
+
+Sem o app, também dá para aprovar no painel: **Table Editor → `account_approvals` → coluna `status`** (`approved`, `pending`, `blocked`).
 
 ## Estrutura
 

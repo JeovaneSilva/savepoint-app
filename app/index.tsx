@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,7 @@ import { BarChart3, Library, Search } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { H2, Text } from "@/components/ui/Text";
 import { Logo, RawgAttribution } from "@/components/Brand";
+import { SignedInRedirect } from "@/components/SignedInRedirect";
 import { useAuth } from "@/hooks/use-auth";
 import { alpha, colors, radius, shadowCard } from "@/theme";
 
@@ -19,7 +20,7 @@ const FEATURES = [
 export default function Landing() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  if (user) return <Redirect href="/biblioteca" />;
+  if (user) return <SignedInRedirect />;
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ paddingBottom: 24 }}>
       <View style={{ paddingTop: insets.top }}>
