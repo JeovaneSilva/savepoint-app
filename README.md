@@ -52,6 +52,34 @@ Toda conta nova nasce **pendente**: o app mostra "aguardando aprovação" e o ba
 
 Sem o app, também dá para aprovar no painel: **Table Editor → `account_approvals` → coluna `status`** (`approved`, `pending`, `blocked`).
 
+## Gerar o APK (Android)
+
+O APK é o instalador que você manda para os amigos. Usa o EAS Build (Expo), que compila na nuvem; não precisa de Android Studio.
+
+1. Crie uma conta gratuita em https://expo.dev e, na pasta do projeto, entre nela:
+   ```bash
+   npx eas-cli login
+   ```
+2. Vincule o projeto à sua conta (uma vez; grava o `projectId` no `app.json`):
+   ```bash
+   npx eas-cli init
+   ```
+3. Envie as chaves do Supabase para o ambiente `preview` do EAS. O `.env` não vai para o build (está no `.gitignore`), e sem estas
+   variáveis o app abriria com erro. São a URL e a chave **pública** do projeto:
+   ```bash
+   npx eas-cli env:push preview --path .env
+   ```
+4. Gere o APK (leva uns 10 a 20 minutos; na primeira vez ele oferece criar a chave de assinatura: aceite):
+   ```bash
+   npx eas-cli build --platform android --profile preview
+   ```
+5. Ao terminar, o EAS mostra um link e um QR code. Quem abrir o link no celular Android baixa o `.apk`; é preciso permitir a instalação de
+   apps de fontes desconhecidas. **Guarde a chave de assinatura** (o EAS a mantém na sua conta): atualizações só instalam por cima se
+   forem assinadas com a mesma chave.
+
+Cada mudança no app exige um novo build (o plano gratuito tem limite mensal de builds). Os perfis estão em `eas.json`:
+`preview` gera APK para instalar direto; `production` gera AAB, que é o formato da Play Store.
+
 ## Estrutura
 
 - `app/` — rotas (Expo Router): landing, login, abas (Buscar, Biblioteca, Estatísticas) e detalhe do jogo

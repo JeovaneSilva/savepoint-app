@@ -20,7 +20,12 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -41,7 +46,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "O SavePoint precisa acessar suas fotos para você escolher a foto de perfil."
+          "photosPermission": "O SavePoint precisa acessar suas fotos para você escolher a foto de perfil.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ]
     ],
