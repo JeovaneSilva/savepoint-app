@@ -1,5 +1,5 @@
 import { forwardRef, useState, type ComponentRef, type ReactNode } from "react";
-import { TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from "react-native";
+import { Platform, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from "react-native";
 import { Text } from "./Text";
 import { alpha, colors, fonts, radius, shadowGlow } from "@/theme";
 
@@ -29,7 +29,8 @@ export const Input = forwardRef<ComponentRef<typeof TextInput>, Props>(function 
           gap: 8,
           backgroundColor: alpha(colors.card, 0.4),
         },
-        focused && shadowGlow,
+        // Glow only on iOS: toggling `elevation` on Android re-creates the native view and drops focus/keyboard.
+        focused && Platform.OS === "ios" && { ...shadowGlow, elevation: undefined },
         containerStyle,
       ]}
     >
@@ -57,7 +58,6 @@ export const Input = forwardRef<ComponentRef<typeof TextInput>, Props>(function 
             paddingVertical: multiline ? 10 : 0,
             minHeight: multiline ? height : undefined,
             textAlignVertical: multiline ? "top" : "center",
-            outlineStyle: "none",
           } as object,
           style,
         ]}
