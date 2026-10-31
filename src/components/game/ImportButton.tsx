@@ -63,7 +63,7 @@ export function ImportButton({ variant = "outline" }: { variant?: "outline" | "n
         parsed = parseImport(await (await fetch(asset.uri)).text());
       } catch {
         setPhase({ step: "idle" });
-        toast.error("Arquivo inválido. Use o JSON ou CSV exportado pelo GameLog.");
+        toast.error("Arquivo inválido. Use o JSON ou CSV exportado pelo app.");
         return;
       }
 

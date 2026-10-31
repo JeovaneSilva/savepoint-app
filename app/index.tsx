@@ -60,7 +60,7 @@ export default function Landing() {
             Todo jogo que você <Text display weight="bold" style={{ fontSize: 44, lineHeight: 48, color: colors.primaryGlow }}>zerou</Text>. E os que ainda vai.
           </Text>
           <Text muted style={{ fontSize: 17, lineHeight: 26, marginTop: 24, maxWidth: 360 }}>
-            O GameLog guarda sua história gamer — PC e console, de qualquer geração.
+            O SavePoint guarda sua história gamer — PC e console, de qualquer geração.
           </Text>
           <View style={{ marginTop: 36, flexDirection: "row" }}>
             <Button variant="neon" size="lg" onPress={() => router.push("/auth")}>

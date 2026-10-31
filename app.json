@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "GameLog",
+    "name": "SavePoint",
     "slug": "savepoint-app",
-    "scheme": "gamelog",
+    "scheme": "savepoint",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,10 +10,10 @@
     "backgroundColor": "#070711",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.savepoint.gamelog"
+      "bundleIdentifier": "com.savepoint.app"
     },
     "android": {
-      "package": "com.savepoint.gamelog",
+      "package": "com.savepoint.app",
       "adaptiveIcon": {
         "backgroundColor": "#070711",
         "foregroundImage": "./assets/android-icon-foreground.png",

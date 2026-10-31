@@ -1,4 +1,4 @@
-# GameLog (app)
+# SavePoint (app)
 
 App mobile (Expo + React Native + TypeScript) para registrar os jogos que você zerou, está jogando ou quer jogar.
 Backend: Supabase. Dados dos jogos: [RAWG](https://rawg.io).
@@ -34,5 +34,5 @@ Chave gratuita da RAWG: https://rawg.io/apidocs
 - `src/components/` — UI (`ui/`), componentes de jogo (`game/`), gráficos
 - `src/hooks/` — auth e biblioteca (React Query + Supabase)
 - `src/lib/` — cliente Supabase, RAWG, regras de negócio (`games.ts`)
-- `src/theme.ts` — tokens de design (tema escuro roxo neon/ciano do GameLog)
+- `src/theme.ts` — tokens de design (tema escuro roxo neon/ciano do SavePoint)
 - `supabase/` — migration SQL e Edge Function `rawg`

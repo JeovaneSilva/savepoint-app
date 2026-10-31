@@ -26,9 +26,9 @@ export function Logo({ size = 24 }: { size?: number }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center" }}>
       <Text display weight="bold" style={style}>
-        Game
+        Save
       </Text>
-      <GradientText style={{ ...style, fontFamily: "ChakraPetch_700Bold" }}>Log</GradientText>
+      <GradientText style={{ ...style, fontFamily: "ChakraPetch_700Bold" }}>Point</GradientText>
     </View>
   );
 }

@@ -14,7 +14,7 @@ export const queryClient = new QueryClient({
 /** On-device copy of the query cache: makes the library and visited games open instantly and offline. */
 export const persister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: "gamelog-query-cache",
+  key: "savepoint-query-cache",
   throttleTime: 1000,
 });
 

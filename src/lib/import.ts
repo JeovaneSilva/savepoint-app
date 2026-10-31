@@ -1,6 +1,6 @@
 import { STATUSES, type GameStatus, type UserGameInsert } from "./games";
 
-/** A game parsed from a GameLog export (JSON or CSV), ready to be inserted. */
+/** A game parsed from a SavePoint export (or the old GameLog web app) (JSON or CSV), ready to be inserted. */
 export type ImportRow = Omit<UserGameInsert, "user_id">;
 
 export interface ParsedImport {
@@ -99,7 +99,7 @@ function parseCsv(text: string): Record<string, string>[] {
   return body.map((r) => Object.fromEntries(keys.map((k, i) => [k, r[i] ?? ""])));
 }
 
-/** Parses the text of a GameLog export file (JSON or CSV). Throws when the format is not recognised. */
+/** Parses the text of an exported library file (JSON or CSV). Throws when the format is not recognised. */
 export function parseImport(text: string): ParsedImport {
   const clean = text.replace(/^﻿/, "").trim();
   let records: Record<string, unknown>[];

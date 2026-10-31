@@ -1,5 +1,5 @@
 /**
- * GameLog design tokens — port of the web app's dark "gamer" theme.
+ * SavePoint design tokens — port of the web app's dark "gamer" theme.
  * Original values were oklch; converted to sRGB hex.
  */
 export const colors = {
