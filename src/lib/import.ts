@@ -27,6 +27,12 @@ const list = (v: unknown): string[] => {
   return s ? s.split(";").map((x) => x.trim()).filter(Boolean) : [];
 };
 
+const hours = (v: unknown): number | null => {
+  const s = str(v)?.replace(",", ".");
+  if (!s || !/^\d{1,5}(\.\d)?$/.test(s)) return null;
+  return Number(s);
+};
+
 const isoDate = (v: unknown): string | null => {
   const s = str(v);
   return s && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null;
@@ -51,11 +57,14 @@ function toRow(raw: Record<string, unknown>): ImportRow | null {
     played_on: str(raw["played_on"]),
     rating: rating != null && rating >= 1 && rating <= 5 ? rating : null,
     completed_at: isoDate(raw["completed_at"]),
+    hours_played: hours(raw["hours_played"]),
     release_year: int(raw["release_year"]),
     genres: list(raw["genres"]),
     platforms: list(raw["platforms"]),
     notes: str(raw["notes"]),
   };
+  // A completed game with no date (old exports, or "não lembro") is stored as "date unknown".
+  row.completed_date_unknown = row.status === "concluido" && !row.completed_at;
   const created = isoTimestamp(raw["created_at"]);
   if (created) row.created_at = created;
   return row;

@@ -168,6 +168,12 @@ export function LibraryGameRow({ game, onEdit }: LibProps) {
           {game.completed_at && (
             <Text muted style={{ fontSize: 12 }}>{`Zerado em ${formatDate(game.completed_at)}`}</Text>
           )}
+          {game.status === "concluido" && !game.completed_at && (
+            <Text muted style={{ fontSize: 12 }}>Zerado (data desconhecida)</Text>
+          )}
+          {game.hours_played != null && (
+            <Text muted style={{ fontSize: 12 }}>{`${String(game.hours_played).replace(".", ",")}h`}</Text>
+          )}
         </View>
         {game.rating != null && <StarRating value={game.rating} size="sm" />}
       </View>

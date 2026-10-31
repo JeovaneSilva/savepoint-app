@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { H2, Text } from "@/components/ui/Text";
 import { GameCover } from "@/components/game/GameCover";
-import { GameEntryForm, todayISO, type EntryValues } from "@/components/game/GameEntryForm";
+import { GameEntryForm, type EntryValues } from "@/components/game/GameEntryForm";
 import { RemoveGameButton } from "@/components/game/RemoveGameButton";
 import { StatusBadge } from "@/components/game/StatusBadge";
 import { libraryQuery, useAddGame, useUpdateGame } from "@/hooks/use-library";
@@ -272,8 +272,24 @@ function MyDataForm({ rawg, entry }: { rawg: GameDetails; entry: UserGame | unde
   const add = useAddGame();
   const update = useUpdateGame();
   const initial: EntryValues = entry
-    ? { status: entry.status, played_on: entry.played_on, rating: entry.rating, completed_at: entry.completed_at, notes: entry.notes }
-    : { status: "quero_jogar", played_on: null, rating: null, completed_at: null, notes: null };
+    ? {
+        status: entry.status,
+        played_on: entry.played_on,
+        rating: entry.rating,
+        completed_at: entry.completed_at,
+        completed_date_unknown: entry.completed_date_unknown ?? false,
+        hours_played: entry.hours_played ?? null,
+        notes: entry.notes,
+      }
+    : {
+        status: "quero_jogar",
+        played_on: null,
+        rating: null,
+        completed_at: null,
+        completed_date_unknown: false,
+        hours_played: null,
+        notes: null,
+      };
 
   return (
     <GameEntryForm
@@ -293,7 +309,6 @@ function MyDataForm({ rawg, entry }: { rawg: GameDetails; entry: UserGame | unde
             platforms: rawg.platforms,
             genres: rawg.genres,
             ...v,
-            completed_at: v.status === "concluido" ? (v.completed_at ?? todayISO()) : null,
           });
         }
       }}

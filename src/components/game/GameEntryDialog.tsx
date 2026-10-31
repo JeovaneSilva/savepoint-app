@@ -30,6 +30,8 @@ export function GameEntryDialog({ target, onClose }: { target: EntryTarget | nul
               : null,
           rating: null,
           completed_at: target.status === "concluido" ? todayISO() : null,
+          completed_date_unknown: false,
+          hours_played: null,
           notes: null,
         }
       : {
@@ -37,6 +39,8 @@ export function GameEntryDialog({ target, onClose }: { target: EntryTarget | nul
           played_on: target.entry.played_on,
           rating: target.entry.rating,
           completed_at: target.entry.completed_at,
+          completed_date_unknown: target.entry.completed_date_unknown ?? false,
+          hours_played: target.entry.hours_played ?? null,
           notes: target.entry.notes,
         };
 

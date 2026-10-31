@@ -74,6 +74,11 @@ export default function RankingScreen() {
           { value: "year", label: `Este ano (${year})` },
         ]}
       />
+      {mode === "year" && (
+        <Text muted style={{ fontSize: 12 }}>
+          Só contam jogos zerados com data de conclusão neste ano. Os sem data entram apenas no Total.
+        </Text>
+      )}
       {q.isError && (
         <EmptyState
           icon={<Ghost size={40} color={colors.destructive} />}

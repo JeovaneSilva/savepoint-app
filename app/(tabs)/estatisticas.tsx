@@ -71,6 +71,11 @@ export default function EstatisticasScreen() {
         ) : (
           <YearBars data={s.completedByYear} />
         )}
+        {s.completedWithoutDate > 0 && (
+          <Text muted style={{ fontSize: 12, marginTop: 8 }}>
+            {`${s.completedWithoutDate} ${s.completedWithoutDate === 1 ? "jogo zerado sem data não aparece" : "jogos zerados sem data não aparecem"} neste gráfico.`}
+          </Text>
+        )}
       </Panel>
 
       <Panel title="Por plataforma">

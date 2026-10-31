@@ -17,6 +17,8 @@ export type Database = {
       user_games: {
         Row: {
           completed_at: string | null
+          completed_date_unknown: boolean
+          hours_played: number | null
           cover_url: string | null
           created_at: string
           genres: string[]
@@ -34,6 +36,8 @@ export type Database = {
         }
         Insert: {
           completed_at?: string | null
+          completed_date_unknown?: boolean
+          hours_played?: number | null
           cover_url?: string | null
           created_at?: string
           genres?: string[]
@@ -51,6 +55,8 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
+          completed_date_unknown?: boolean
+          hours_played?: number | null
           cover_url?: string | null
           created_at?: string
           genres?: string[]

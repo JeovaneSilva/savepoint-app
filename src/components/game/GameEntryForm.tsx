@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
-import { CalendarDays } from "lucide-react-native";
+import { CalendarDays, Check } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Text } from "@/components/ui/Text";
+import { toast } from "@/components/ui/Toast";
 import { StarRating } from "./StarRating";
-import { colors, radius } from "@/theme";
+import { alpha, colors, radius } from "@/theme";
 import { STATUSES, STATUS_LABEL, type GameStatus } from "@/lib/games";
 
 export interface EntryValues {
@@ -15,6 +16,10 @@ export interface EntryValues {
   played_on: string | null;
   rating: number | null;
   completed_at: string | null;
+  /** "I don't remember when I finished it" (old games): no date, but still counts as completed. */
+  completed_date_unknown: boolean;
+  /** Optional: hours it took to finish. */
+  hours_played: number | null;
   notes: string | null;
 }
 
@@ -30,6 +35,7 @@ export function fieldsFor(status: GameStatus) {
     platform: status !== "quero_jogar",
     rating: status === "concluido" || status === "abandonado",
     completedAt: status === "concluido",
+    hours: status === "concluido",
   };
 }
 
@@ -54,10 +60,23 @@ export function normalizeEntry(v: EntryValues): EntryValues {
     status: v.status,
     played_on: f.platform ? v.played_on || null : null,
     rating: f.rating ? v.rating : null,
-    completed_at: f.completedAt ? v.completed_at || null : null,
+    // Either a date or "unknown", never both.
+    completed_at: f.completedAt && !v.completed_date_unknown ? v.completed_at || null : null,
+    completed_date_unknown: f.completedAt && v.completed_date_unknown,
+    hours_played: f.hours ? v.hours_played : null,
     notes: v.notes?.trim() ? v.notes.trim() : null,
   };
 }
+
+/** "12", "12,5" or "12.5" -> number; empty -> null; anything else -> undefined (invalid). */
+export function parseHours(text: string): number | null | undefined {
+  const t = text.trim().replace(",", ".");
+  if (!t) return null;
+  if (!/^\d{1,5}(\.\d)?$/.test(t)) return undefined;
+  return Number(t);
+}
+
+const hoursToText = (h: number | null | undefined) => (h == null ? "" : String(h).replace(".", ","));
 
 const toDate = (iso: string | null) => (iso ? new Date(`${iso}T12:00:00`) : new Date());
 const toISO = (d: Date) => {
@@ -125,6 +144,7 @@ interface Props {
 
 export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubmit, onCancel }: Props) {
   const [v, setV] = useState<EntryValues>(initial);
+  const [hoursText, setHoursText] = useState(hoursToText(initial.hours_played));
   const set = <K extends keyof EntryValues>(k: K, val: EntryValues[K]) => setV((p) => ({ ...p, [k]: val }));
   const show = fieldsFor(v.status);
   const platformOptions = Array.from(new Set([...(v.played_on ? [v.played_on] : []), ...platforms]));
@@ -174,9 +194,57 @@ export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubm
       )}
 
       {show.completedAt && (
+        <View style={{ gap: 12 }}>
+          <View>
+            <Label>Data de conclusão</Label>
+            {v.completed_date_unknown ? (
+              <Text muted>Sem data: o jogo conta como zerado, mas não entra no ranking do ano.</Text>
+            ) : (
+              <DateField value={v.completed_at} onChange={(d) => set("completed_at", d)} />
+            )}
+          </View>
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: v.completed_date_unknown }}
+            onPress={() =>
+              setV((p) => ({
+                ...p,
+                completed_date_unknown: !p.completed_date_unknown,
+                // Coming back from "unknown": suggest today so the date field isn't empty.
+                completed_at: p.completed_date_unknown ? (p.completed_at ?? todayISO()) : null,
+              }))
+            }
+            style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+          >
+            <View
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: v.completed_date_unknown ? colors.primary : colors.border,
+                backgroundColor: v.completed_date_unknown ? colors.primary : alpha(colors.card, 0.4),
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {v.completed_date_unknown && <Check size={14} color={colors.primaryForeground} />}
+            </View>
+            <Text>Não lembro quando zerei</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {show.hours && (
         <View>
-          <Label>Data de conclusão</Label>
-          <DateField value={v.completed_at} onChange={(d) => set("completed_at", d)} />
+          <Label>Horas para zerar (opcional)</Label>
+          <Input
+            value={hoursText}
+            onChangeText={setHoursText}
+            keyboardType="decimal-pad"
+            maxLength={7}
+            placeholder="Ex.: 25 ou 12,5"
+          />
         </View>
       )}
 
@@ -201,7 +269,14 @@ export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubm
         <Button
           variant="neon"
           loading={pending}
-          onPress={() => onSubmit(normalizeEntry(v))}
+          onPress={() => {
+            const hours = show.hours ? parseHours(hoursText) : null;
+            if (hours === undefined) {
+              toast.error("Horas inválidas. Use um número, como 25 ou 12,5.");
+              return;
+            }
+            onSubmit(normalizeEntry({ ...v, hours_played: hours }));
+          }}
         >
           {pending ? "Salvando…" : submitLabel}
         </Button>

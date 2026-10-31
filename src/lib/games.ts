@@ -227,6 +227,8 @@ export interface LibraryStats {
   counts: Record<GameStatus, number>;
   averageRating: number | null;
   completedByYear: { year: number; count: number }[];
+  /** Completed games with no date ("não lembro"): counted in totals, absent from the per-year chart. */
+  completedWithoutDate: number;
   byPlatform: { name: string; count: number }[];
   byGenre: { name: string; count: number }[];
   lastCompleted: UserGame[];
@@ -261,12 +263,10 @@ export function computeStats(games: UserGame[]): LibraryStats {
     .map(([year, count]) => ({ year, count }))
     .sort((a, b) => a.year - b.year);
 
-  const lastCompleted = [...completed]
-    .sort((a, b) => {
-      const da = Date.parse(a.completed_at ?? a.updated_at);
-      const db = Date.parse(b.completed_at ?? b.updated_at);
-      return db - da;
-    })
+  // "Last completed" only makes sense for games with a known date.
+  const lastCompleted = completed
+    .filter((g) => !!g.completed_at)
+    .sort((a, b) => Date.parse(b.completed_at ?? "") - Date.parse(a.completed_at ?? ""))
     .slice(0, 5);
 
   return {
@@ -274,6 +274,7 @@ export function computeStats(games: UserGame[]): LibraryStats {
     counts,
     averageRating,
     completedByYear,
+    completedWithoutDate: completed.filter((g) => !g.completed_at).length,
     byPlatform: topCounts(
       games.map((g) => g.played_on).filter((p): p is string => !!p),
       8,
@@ -294,6 +295,8 @@ const EXPORT_FIELDS = [
   "played_on",
   "rating",
   "completed_at",
+  "completed_date_unknown",
+  "hours_played",
   "release_year",
   "genres",
   "platforms",
