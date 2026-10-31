@@ -39,7 +39,7 @@ export function ExportMenu({ games }: { games: UserGame[] }) {
     setOpen(false);
     try {
       if (kind === "json") await share(toExportJson(games), `savepoint-${stamp}.json`, "application/json");
-      else await share("FEFF" + toCsv(games), `savepoint-${stamp}.csv`, "text/csv");
+      else await share("﻿" + toCsv(games), `savepoint-${stamp}.csv`, "text/csv");
       toast.success(kind === "json" ? "Lista exportada em JSON" : "Lista exportada em CSV");
     } catch {
       toast.error("Não foi possível exportar a lista");
