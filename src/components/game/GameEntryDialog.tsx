@@ -24,7 +24,10 @@ export function GameEntryDialog({ target, onClose }: { target: EntryTarget | nul
     : target.mode === "add"
       ? {
           status: target.status,
-          played_on: target.game.platforms.length === 1 ? (target.game.platforms[0] ?? null) : null,
+          played_on:
+            target.status !== "quero_jogar" && target.game.platforms.length === 1
+              ? (target.game.platforms[0] ?? null)
+              : null,
           rating: null,
           completed_at: target.status === "concluido" ? todayISO() : null,
           notes: null,

@@ -24,6 +24,41 @@ export function todayISO() {
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
 
+/** Which fields make sense for each status (you can't rate a game you haven't played yet). */
+export function fieldsFor(status: GameStatus) {
+  return {
+    platform: status !== "quero_jogar",
+    rating: status === "concluido" || status === "abandonado",
+    completedAt: status === "concluido",
+  };
+}
+
+const PLATFORM_LABEL: Record<GameStatus, string> = {
+  quero_jogar: "Plataforma",
+  jogando: "Plataforma em que estou jogando",
+  concluido: "Plataforma em que joguei",
+  abandonado: "Plataforma em que joguei",
+};
+
+const NOTES_PLACEHOLDER: Record<GameStatus, string> = {
+  quero_jogar: "Por que quer jogar? Quem indicou? Onde pretende jogar…",
+  jogando: "Em que parte está, impressões até agora…",
+  concluido: "Memórias, dicas, com quem jogou…",
+  abandonado: "Por que parou? Onde travou…",
+};
+
+/** Clears the values that don't apply to the chosen status, so the saved data stays consistent. */
+export function normalizeEntry(v: EntryValues): EntryValues {
+  const f = fieldsFor(v.status);
+  return {
+    status: v.status,
+    played_on: f.platform ? v.played_on || null : null,
+    rating: f.rating ? v.rating : null,
+    completed_at: f.completedAt ? v.completed_at || null : null,
+    notes: v.notes?.trim() ? v.notes.trim() : null,
+  };
+}
+
 const toDate = (iso: string | null) => (iso ? new Date(`${iso}T12:00:00`) : new Date());
 const toISO = (d: Date) => {
   const tz = d.getTimezoneOffset() * 60000;
@@ -91,6 +126,7 @@ interface Props {
 export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubmit, onCancel }: Props) {
   const [v, setV] = useState<EntryValues>(initial);
   const set = <K extends keyof EntryValues>(k: K, val: EntryValues[K]) => setV((p) => ({ ...p, [k]: val }));
+  const show = fieldsFor(v.status);
   const platformOptions = Array.from(new Set([...(v.played_on ? [v.played_on] : []), ...platforms]));
 
   return (
@@ -107,32 +143,37 @@ export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubm
               ...p,
               status,
               completed_at: status === "concluido" ? (p.completed_at ?? todayISO()) : p.completed_at,
+              played_on: p.played_on ?? (status !== "quero_jogar" && platforms.length === 1 ? (platforms[0] ?? null) : null),
             }));
           }}
         />
       </View>
 
-      <View>
-        <Label>Plataforma em que joguei</Label>
-        {platformOptions.length > 0 ? (
-          <Select
-            title="Plataforma em que joguei"
-            value={v.played_on}
-            placeholder="Escolha a plataforma"
-            options={platformOptions.map((p) => ({ value: p, label: p }))}
-            onChange={(p) => set("played_on", p || null)}
-          />
-        ) : (
-          <Input value={v.played_on ?? ""} onChangeText={(t) => set("played_on", t || null)} placeholder="Ex.: SNES" />
-        )}
-      </View>
+      {show.platform && (
+        <View>
+          <Label>{PLATFORM_LABEL[v.status]}</Label>
+          {platformOptions.length > 0 ? (
+            <Select
+              title={PLATFORM_LABEL[v.status]}
+              value={v.played_on}
+              placeholder="Escolha a plataforma"
+              options={platformOptions.map((p) => ({ value: p, label: p }))}
+              onChange={(p) => set("played_on", p || null)}
+            />
+          ) : (
+            <Input value={v.played_on ?? ""} onChangeText={(t) => set("played_on", t || null)} placeholder="Ex.: SNES" />
+          )}
+        </View>
+      )}
 
-      <View>
-        <Label>Minha nota</Label>
-        <StarRating value={v.rating} onChange={(r) => set("rating", r)} size="lg" />
-      </View>
+      {show.rating && (
+        <View>
+          <Label>Minha nota</Label>
+          <StarRating value={v.rating} onChange={(r) => set("rating", r)} size="lg" />
+        </View>
+      )}
 
-      {v.status === "concluido" && (
+      {show.completedAt && (
         <View>
           <Label>Data de conclusão</Label>
           <DateField value={v.completed_at} onChange={(d) => set("completed_at", d)} />
@@ -147,7 +188,7 @@ export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubm
           maxLength={2000}
           value={v.notes ?? ""}
           onChangeText={(t) => set("notes", t)}
-          placeholder="Memórias, dicas, com quem jogou…"
+          placeholder={NOTES_PLACEHOLDER[v.status]}
         />
       </View>
 
@@ -160,13 +201,7 @@ export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubm
         <Button
           variant="neon"
           loading={pending}
-          onPress={() =>
-            onSubmit({
-              ...v,
-              completed_at: v.status === "concluido" ? v.completed_at || null : null,
-              notes: v.notes?.trim() ? v.notes.trim() : null,
-            })
-          }
+          onPress={() => onSubmit(normalizeEntry(v))}
         >
           {pending ? "Salvando…" : submitLabel}
         </Button>
