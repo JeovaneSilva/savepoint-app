@@ -14,9 +14,24 @@ export function invalidateDerived(qc: ReturnType<typeof useQueryClient>) {
 export const libraryQuery = queryOptions({
   queryKey: ["library"],
   queryFn: async (): Promise<UserGame[]> => {
-    const { data, error } = await supabase.from("user_games").select("*").order("created_at", { ascending: false });
-    if (error) throw error;
-    return data ?? [];
+    // The API returns at most ~1000 rows per request: read the library in pages so nothing is cut off silently.
+    const PAGE = 500;
+    const all: UserGame[] = [];
+    let total = Infinity;
+    while (all.length < total) {
+      const { data, error, count } = await supabase
+        .from("user_games")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false }) // stable order across pages
+        .range(all.length, all.length + PAGE - 1);
+      if (error) throw error;
+      const rows = data ?? [];
+      total = count ?? rows.length;
+      if (rows.length === 0) break; // nothing more (guards against an endless loop)
+      all.push(...rows);
+    }
+    return all;
   },
 });
 

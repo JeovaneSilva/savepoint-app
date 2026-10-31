@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Stack, SplashScreen } from "expo-router";
+import { Stack, SplashScreen, type ErrorBoundaryProps } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -8,11 +8,17 @@ import { Rubik_400Regular, Rubik_500Medium, Rubik_600SemiBold, Rubik_700Bold } f
 import { ChakraPetch_500Medium, ChakraPetch_600SemiBold, ChakraPetch_700Bold } from "@expo-google-fonts/chakra-petch";
 import { useAccountStatus } from "@/hooks/use-account";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { ErrorScreen } from "@/components/ErrorScreen";
 import { ToastProvider } from "@/components/ui/Toast";
 import { CACHE_MAX_AGE, persister, queryClient, shouldPersist } from "@/lib/query";
 import { colors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
+
+/** expo-router renders this instead of the app when something throws while rendering. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return <ErrorScreen error={error} onRetry={() => void retry()} />;
+}
 
 function RootNavigator() {
   const { user, loading } = useAuth();

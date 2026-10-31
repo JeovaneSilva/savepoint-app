@@ -116,6 +116,17 @@ export default function BuscarScreen() {
           title="Limite mensal da base de jogos atingido"
           text="Novas buscas voltam no mês que vem. Jogos já consultados continuam disponíveis."
         />
+      ) : error === "rate_limited" ? (
+        <EmptyState
+          icon={<Ghost size={40} color={colors.statusWant} />}
+          title="Muitas buscas em pouco tempo"
+          text="Para não esgotar a cota compartilhada, há um limite por hora. Tente de novo daqui a alguns minutos."
+          action={
+            <Button variant="outline" onPress={() => q.refetch()}>
+              Tentar de novo
+            </Button>
+          }
+        />
       ) : failed ? (
         <EmptyState
           icon={<Ghost size={40} color={colors.destructive} />}

@@ -57,7 +57,7 @@ export default function GameScreen() {
     queryFn: async () => {
       const res = await getGameDetails(rawgId);
       // Throw on transient failures so they are neither cached nor saved on the device.
-      if (res.error === "unavailable" || res.error === "quota") throw new Error(res.error);
+      if (res.error === "unavailable" || res.error === "quota" || res.error === "rate_limited") throw new Error(res.error);
       return res;
     },
     enabled: Number.isInteger(rawgId) && rawgId > 0,
@@ -95,6 +95,17 @@ export default function GameScreen() {
                 icon={<Ghost size={40} color={colors.statusWant} />}
                 title="Limite mensal da base de jogos atingido"
                 text="Os detalhes de jogos novos voltam no mês que vem. Jogos já abertos continuam disponíveis."
+              />
+            ) : details.isError && details.error.message === "rate_limited" ? (
+              <EmptyState
+                icon={<Ghost size={40} color={colors.statusWant} />}
+                title="Muitas consultas em pouco tempo"
+                text="Há um limite por hora para proteger a cota compartilhada. Tente de novo daqui a alguns minutos."
+                action={
+                  <Button variant="outline" onPress={() => details.refetch()}>
+                    Tentar de novo
+                  </Button>
+                }
               />
             ) : details.isError ? (
               <EmptyState

@@ -24,6 +24,7 @@ Escaneie o QR code com o **Expo Go** ou use `npm run android` / `npm run ios` / 
    - `supabase/migrations/0005_avatars_read_policy.sql` (permite substituir a foto de perfil)
    - `supabase/migrations/0006_harder_badges.sql` (quadro de selos mais difícil; recalcula todos os selos)
    - `supabase/migrations/0007_account_approval.sql` (aprovação manual de contas)
+   - `supabase/migrations/0008_rawg_user_limit.sql` (limite de buscas por usuário na RAWG)
 2. **Busca de jogos:** a chave da RAWG fica numa Edge Function, nunca no app.
 
 ```bash
@@ -79,6 +80,14 @@ O APK é o instalador que você manda para os amigos. Usa o EAS Build (Expo), qu
 
 Cada mudança no app exige um novo build (o plano gratuito tem limite mensal de builds). Os perfis estão em `eas.json`:
 `preview` gera APK para instalar direto; `production` gera AAB, que é o formato da Play Store.
+
+## Limites da busca de jogos (RAWG)
+
+A Edge Function `rawg` protege a cota gratuita da RAWG (20 mil requisições por mês):
+- cache compartilhado (respostas do cache não contam);
+- **limite por usuário**: 300 requisições reais à RAWG por hora (cache hit é grátis). Ajuste com o secret `RAWG_USER_HOURLY_LIMIT`;
+- **limite mensal**: 18.000 (secret `RAWG_MONTHLY_LIMIT`);
+- os parâmetros de busca são validados; entradas fora do padrão recebem erro 400.
 
 ## Estrutura
 

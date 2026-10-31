@@ -5,12 +5,12 @@ export type SearchResponse = {
   results: GameSummary[];
   hasMore: boolean;
   count: number;
-  error?: "missing_key" | "quota" | "unavailable";
+  error?: "missing_key" | "quota" | "rate_limited" | "unavailable";
 };
 
 export type DetailsResponse = {
   game: GameDetails | null;
-  error?: "missing_key" | "not_found" | "quota" | "unavailable";
+  error?: "missing_key" | "not_found" | "quota" | "rate_limited" | "unavailable";
 };
 
 /** Search games through the `rawg` Edge Function (the RAWG key stays server-side). */
