@@ -17,7 +17,7 @@ import { GameEntryForm, todayISO, type EntryValues } from "@/components/game/Gam
 import { RemoveGameButton } from "@/components/game/RemoveGameButton";
 import { StatusBadge } from "@/components/game/StatusBadge";
 import { libraryQuery, useAddGame, useUpdateGame } from "@/hooks/use-library";
-import { getGameDetails } from "@/lib/rawg";
+import { getGameDetails, type DetailsResponse } from "@/lib/rawg";
 import { rawgThumb, type GameDetails, type UserGame } from "@/lib/games";
 import { alpha, colors, radius, shadowGlow } from "@/theme";
 
@@ -27,14 +27,45 @@ export default function GameScreen() {
   const insets = useSafeAreaInsets();
   const [shot, setShot] = useState<string | null>(null);
 
-  const details = useQuery({
-    queryKey: ["rawg-game", rawgId],
-    queryFn: () => getGameDetails(rawgId),
-    enabled: Number.isInteger(rawgId) && rawgId > 0,
-    staleTime: 30 * 60_000,
-  });
   const { data: library } = useQuery(libraryQuery);
   const entry = library?.find((g) => g.rawg_id === rawgId);
+
+  // Games already in the library open instantly with what is stored; the rest loads in the background.
+  const placeholder: DetailsResponse | undefined = entry
+    ? {
+        game: {
+          id: entry.rawg_id,
+          name: entry.name,
+          cover: entry.cover_url,
+          year: entry.release_year,
+          platforms: entry.platforms,
+          parentPlatforms: [],
+          genres: entry.genres,
+          metacritic: null,
+          released: null,
+          description: "",
+          developers: [],
+          publishers: [],
+          website: null,
+          screenshots: [],
+        },
+      }
+    : undefined;
+
+  const details = useQuery({
+    queryKey: ["rawg-game", rawgId],
+    queryFn: async () => {
+      const res = await getGameDetails(rawgId);
+      // Throw on transient failures so they are neither cached nor saved on the device.
+      if (res.error === "unavailable" || res.error === "quota") throw new Error(res.error);
+      return res;
+    },
+    enabled: Number.isInteger(rawgId) && rawgId > 0,
+    staleTime: 30 * 24 * 60 * 60 * 1000, // details rarely change; also cached on the device
+    retry: false,
+    ...(placeholder ? { placeholderData: placeholder } : {}),
+  });
+  const loadingExtra = details.isPlaceholderData;
 
   const back = () => (router.canGoBack() ? router.back() : router.replace("/biblioteca"));
   const g = details.data?.game;
@@ -59,7 +90,24 @@ export default function GameScreen() {
           </View>
         ) : !g ? (
           <View style={{ paddingHorizontal: 16 }}>
-            {details.data?.error === "missing_key" ? (
+            {details.isError && details.error.message === "quota" ? (
+              <EmptyState
+                icon={<Ghost size={40} color={colors.statusWant} />}
+                title="Limite mensal da base de jogos atingido"
+                text="Os detalhes de jogos novos voltam no mês que vem. Jogos já abertos continuam disponíveis."
+              />
+            ) : details.isError ? (
+              <EmptyState
+                icon={<Ghost size={40} color={colors.destructive} />}
+                title="Não foi possível carregar o jogo"
+                text="Verifique a conexão e tente de novo."
+                action={
+                  <Button variant="outline" onPress={() => details.refetch()}>
+                    Tentar de novo
+                  </Button>
+                }
+              />
+            ) : details.data?.error === "missing_key" ? (
               <EmptyState
                 icon={<KeyRound size={40} color={colors.accent} />}
                 title="A base de jogos ainda não está conectada"
@@ -110,11 +158,22 @@ export default function GameScreen() {
             <View style={{ paddingHorizontal: 16, gap: 28 }}>
               <View style={{ gap: 12 }}>
                 <H2>Sobre o jogo</H2>
-                <Text muted style={{ lineHeight: 22, fontSize: 15 }}>
-                  {g.description || "Sem descrição disponível."}
-                </Text>
+                {loadingExtra ? (
+                  <View style={{ gap: 8 }}>
+                    <Skeleton width="100%" height={14} />
+                    <Skeleton width="92%" height={14} />
+                    <Skeleton width="60%" height={14} />
+                  </View>
+                ) : (
+                  <Text muted style={{ lineHeight: 22, fontSize: 15 }}>
+                    {g.description || "Sem descrição disponível."}
+                  </Text>
+                )}
               </View>
 
+              {loadingExtra ? (
+                <Skeleton width="100%" height={200} radius={radius["2xl"]} />
+              ) : (
               <Card style={{ gap: 16 }}>
                 <Info label="Desenvolvedora" value={g.developers.join(", ")} />
                 <Info label="Publicadora" value={g.publishers.join(", ")} />
@@ -138,6 +197,7 @@ export default function GameScreen() {
                   </Pressable>
                 )}
               </Card>
+              )}
 
               {g.screenshots.length > 0 && (
                 <View style={{ gap: 12 }}>
