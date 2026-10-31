@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { Tabs } from "@/components/ui/Tabs";
 import { H1, Text } from "@/components/ui/Text";
 import { ExportMenu } from "@/components/game/ExportMenu";
+import { ImportButton } from "@/components/game/ImportButton";
 import { LibraryGameCard, LibraryGameRow } from "@/components/game/GameCards";
 import { GameEntryDialog, type EntryTarget } from "@/components/game/GameEntryDialog";
 import { useLibrary } from "@/hooks/use-library";
@@ -83,9 +84,12 @@ export default function BibliotecaScreen() {
           title="Sua biblioteca está vazia"
           text="Busque os jogos que você já zerou ou quer jogar e comece sua coleção."
           action={
-            <Button variant="neon" onPress={() => router.navigate("/buscar")}>
-              Buscar jogos
-            </Button>
+            <View style={{ gap: 10, alignItems: "center" }}>
+              <Button variant="neon" onPress={() => router.navigate("/buscar")}>
+                Buscar jogos
+              </Button>
+              <ImportButton />
+            </View>
           }
         />
       </View>
@@ -94,14 +98,17 @@ export default function BibliotecaScreen() {
 
   const header = (
     <View style={{ gap: 14, marginBottom: 16 }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+        <View style={{ flexGrow: 1, minWidth: 200 }}>
           <H1>Minha Biblioteca</H1>
           <Text muted style={{ marginTop: 4 }}>
             {`${games.length} ${games.length === 1 ? "jogo registrado" : "jogos registrados"}`}
           </Text>
         </View>
-        <ExportMenu games={games} />
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <ImportButton />
+          <ExportMenu games={games} />
+        </View>
       </View>
 
       <View style={{ marginHorizontal: -16 }}>
