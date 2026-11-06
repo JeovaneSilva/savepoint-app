@@ -261,6 +261,51 @@ function toDetails(g: IgdbGame, extra: DetailExtras = {}) {
 
 /* ---------- query building (Apicalypse) ---------- */
 
+/**
+ * Words people add that are rarely part of the IGDB title ("resident evil 4 remake": the 2023 game is just "Resident
+ * Evil 4"). IGDB search needs every word, so they are dropped; if nothing is left the term stays as typed.
+ */
+const SEARCH_NOISE = /\b(?:remake|remastered|remaster|reimagined|hd|definitive edition|game of the year|goty)\b/gi;
+function cleanSearchTerm(term: string): string {
+  const cleaned = term.replace(SEARCH_NOISE, " ").replace(/\s+/g, " ").trim();
+  return cleaned.length >= 2 ? cleaned : term.trim();
+}
+
+const ROMAN = ["", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx"];
+
+/** "final fantasy 7" <-> "final fantasy vii": swaps every number-like word. Null when there is nothing to swap. */
+function swapNumerals(term: string): string | null {
+  let changed = false;
+  const out = term.split(" ").map((w) => {
+    const lower = w.toLowerCase();
+    if (/^[0-9]{1,2}$/.test(w) && Number(w) >= 1 && Number(w) <= 20) {
+      changed = true;
+      return ROMAN[Number(w)]!.toUpperCase();
+    }
+    const i = ROMAN.indexOf(lower);
+    if (i > 0 && w === w.toUpperCase()) {
+      changed = true;
+      return String(i);
+    }
+    return w;
+  });
+  return changed ? out.join(" ") : null;
+}
+
+/** Looser terms to try when a search finds nothing: numerals swapped, then without the last word (a subtitle or nickname). */
+function fallbackTerms(term: string): string[] {
+  const base = cleanSearchTerm(term);
+  const words = base.split(" ").filter(Boolean);
+  const out: string[] = [];
+  const swapped = swapNumerals(base);
+  if (swapped) out.push(swapped);
+  if (words.length >= 2) {
+    const shorter = words.slice(0, -1).join(" ");
+    if (shorter.length >= 3) out.push(shorter);
+  }
+  return [...new Set(out)].filter((t) => t.toLowerCase() !== base.toLowerCase()).slice(0, 2);
+}
+
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\u0000-\u001f]/g, " ");
 
 interface ListFilters {
@@ -281,13 +326,18 @@ interface ListFilters {
  * most rated games that match, with pages. "Em breve" lists unreleased games people follow, soonest first.
  * `trending` = "no name search" (cached shorter); `single` = one page only.
  */
-function buildListQuery(f: ListFilters, nowMs: number, opts: { hypes?: boolean } = {}): { body: string; trending: boolean; single: boolean } {
+function buildListQuery(
+  f: ListFilters,
+  nowMs: number,
+  opts: { hypes?: boolean; relaxed?: boolean; term?: string } = {},
+): { body: string; trending: boolean; single: boolean } {
   const day = Math.floor(nowMs / 86_400_000) * 86_400; // rounded to the day so the cache key stays stable
-  const term = f.search.trim();
+  const term = (opts.term ?? f.search).trim();
   const searching = term.length >= 2;
   const upcoming = f.upcoming === true;
 
-  const where = ["parent_game = null", "version_parent = null"];
+  // relaxed (fallback search only): also editions/ports that IGDB files as versions of another game
+  const where = opts.relaxed ? ["parent_game = null"] : ["parent_game = null", "version_parent = null"];
   if (f.platformId) where.push(`platforms = (${f.platformId})`);
   else if (f.platform) where.push(`platforms = (${PLATFORM_IDS[f.platform].join(",")})`);
   if (f.genre) where.push(`genres = (${f.genre})`);
@@ -311,7 +361,7 @@ function buildListQuery(f: ListFilters, nowMs: number, opts: { hypes?: boolean }
   const single = windowed;
   const sort = searching ? "" : upcoming ? "sort first_release_date asc;" : "sort total_rating_count desc;";
   const parts = [
-    searching ? `search "${esc(term)}";` : "",
+    searching ? `search "${esc(cleanSearchTerm(term))}";` : "",
     `fields ${LIST_FIELDS};`,
     `where ${where.join(" & ")};`,
     sort, // IGDB does not allow "sort" together with "search"
@@ -319,6 +369,14 @@ function buildListQuery(f: ListFilters, nowMs: number, opts: { hypes?: boolean }
     `offset ${single ? 0 : (Math.max(1, f.page) - 1) * PAGE_SIZE};`,
   ];
   return { body: parts.filter(Boolean).join(" "), trending: !searching, single };
+}
+
+/** Looser queries for a name search that found nothing (first page only). Empty for any other kind of list. */
+function fallbackQueries(f: ListFilters, nowMs: number): string[] {
+  const term = f.search.trim();
+  if (term.length < 2 || f.page !== 1 || f.upcoming === true) return [];
+  const terms = [term, ...fallbackTerms(term)];
+  return terms.map((t) => buildListQuery(f, nowMs, { relaxed: true, term: t }).body);
 }
 
 /* ---------- matching a game from an old export file (it only has the RAWG id and a title) to its IGDB game ---------- */
@@ -709,6 +767,18 @@ Deno.serve(async (req) => {
           // "hypes" is only used to keep obscure unreleased games out; if IGDB refuses it, list without it.
           if (!(f.upcoming && e instanceof Error && e.message.startsWith("bad_query"))) throw e;
           rows = await igdb<IgdbGame[]>(userId, "games", buildListQuery(f, Date.now(), { hypes: false }).body);
+        }
+        if (rows.length === 0 && q.trending === false) {
+          // Nothing found: try looser versions of the search (editions filed as versions, numerals, a subtitle).
+          for (const body of fallbackQueries(f, Date.now())) {
+            try {
+              rows = await igdb<IgdbGame[]>(userId, "games", body);
+            } catch (e) {
+              if (e instanceof Error && e.message.startsWith("bad_query")) continue;
+              throw e;
+            }
+            if (rows.length > 0) break;
+          }
         }
         return { results: rows.slice(0, PAGE_SIZE).map(toSummary), hasMore: rows.length > PAGE_SIZE };
       });
