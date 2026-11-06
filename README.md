@@ -17,7 +17,7 @@ Escaneie o QR code com o **Expo Go** ou use `npm run android` / `npm run ios` / 
 
 1. **Tabelas e funções:** rode no SQL Editor, em ordem:
    - `supabase/migrations/0000_init_user_games.sql` (biblioteca)
-   - `supabase/migrations/0001_rawg_cache.sql` (cache da RAWG e contador mensal)
+   - `supabase/migrations/0001_rawg_cache.sql` (cache de respostas da API de jogos; o nome `rawg_*` é histórico e hoje serve à IGDB)
    - `supabase/migrations/0002_profiles_ranking.sql` (apelidos e ranking)
    - `supabase/migrations/0003_hours_unknown_date.sql` (horas para zerar e "não lembro quando zerei")
    - `supabase/migrations/0004_badges_profiles.sql` (selos, foto de perfil e perfis públicos)
@@ -27,6 +27,7 @@ Escaneie o QR code com o **Expo Go** ou use `npm run android` / `npm run ios` / 
    - `supabase/migrations/0008_rawg_user_limit.sql` (limite de buscas por usuário)
    - `supabase/migrations/0009_igdb.sql` (coluna `igdb_id`)
    - `supabase/migrations/0010_fresh_start.sql` (**apaga todas as bibliotecas** e deixa os jogos identificados só pelo id da IGDB; as contas ficam)
+   - `supabase/migrations/0011_cleanup_rawg.sql` (remove o contador mensal e o cache antigos da RAWG)
 2. **Busca de jogos (IGDB):** as credenciais da Twitch ficam numa Edge Function, nunca no app.
    - Crie um aplicativo em https://dev.twitch.tv/console (a conta Twitch precisa de verificação em duas etapas) e copie o
      **Client ID** e o **Client Secret**.
@@ -86,7 +87,7 @@ A Edge Function `igdb` protege a API (a IGDB aceita cerca de 4 requisições por
 - limite de 8 s por chamada e pausa de 1 minuto depois de 3 falhas seguidas, para o app responder rápido quando a IGDB cai;
 - os parâmetros de busca são validados; entradas fora do padrão recebem erro 400.
 
-A função `rawg` (`supabase/functions/rawg`) é a versão antiga e pode ser apagada depois da migração.
+As tabelas `rawg_cache` e `rawg_user_usage` e a função `rawg_bump_user` mantêm o nome antigo, mas são usadas pela IGDB.
 
 ## Estrutura
 
@@ -95,4 +96,4 @@ A função `rawg` (`supabase/functions/rawg`) é a versão antiga e pode ser apa
 - `src/hooks/` — auth e biblioteca (React Query + Supabase)
 - `src/lib/` — cliente Supabase, IGDB, regras de negócio (`games.ts`)
 - `src/theme.ts` — tokens de design (tema escuro roxo neon/ciano do SavePoint)
-- `supabase/` — migrations SQL e Edge Functions (`igdb`; `rawg` é a antiga)
+- `supabase/` — migrations SQL e a Edge Function `igdb`

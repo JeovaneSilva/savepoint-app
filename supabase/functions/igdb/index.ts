@@ -1,7 +1,7 @@
 // Supabase Edge Function: IGDB (Twitch) game database proxy.
 //
-// Replaces the RAWG proxy. Same ideas: secrets stay server-side, answers are cached in `rawg_cache` (key prefix
-// "igdb:"), only APPROVED accounts may call it (migration 0007), and each user is limited per hour (migration 0008).
+// Secrets stay server-side, answers are cached in `rawg_cache` (key prefix "igdb:"; the table name is historical from
+// the RAWG days), only APPROVED accounts may call it (migration 0007), and each user is limited per hour (migration 0008).
 //
 // Secrets (Edge Functions -> Secrets): TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET
 // (IGDB_CLIENT_ID / IGDB_CLIENT_SECRET are accepted as aliases).
@@ -82,7 +82,7 @@ const WEBSITE_VARIANTS = [",websites.url,websites.category", ",websites.url", ""
 const ART_FIELDS = ",artworks.image_id,artworks.width,artworks.height,artworks.alpha_channel";
 const DETAIL_EXTRAS = [...WEBSITE_VARIANTS.map((w) => ART_FIELDS + w), ...WEBSITE_VARIANTS];
 
-/** Names shown in the app: keep the short ones the library already uses (they came from RAWG). */
+/** Names shown in the app: keep the short ones the library already uses (the ones the library already uses). */
 const DISPLAY_PLATFORM: Record<string, string> = {
   "PC (Microsoft Windows)": "PC",
   Mac: "macOS",
@@ -127,7 +127,7 @@ function sortedPlatforms(g: IgdbGame) {
   return [...(g.platforms ?? [])].sort((a, b) => rank(a) - rank(b));
 }
 
-/** Shorter genre names, matching the ones the library already has (they came from RAWG). */
+/** Shorter genre names, matching the ones the library already has (the ones the library already uses). */
 const DISPLAY_GENRE: Record<string, string> = {
   "Role-playing (RPG)": "RPG",
   Platform: "Platformer",
@@ -260,7 +260,7 @@ function buildListQuery(f: ListFilters, nowMs: number): { body: string; trending
   return { body: parts.filter(Boolean).join(" "), trending: !searching };
 }
 
-/* ---------- matching an old (RAWG) game to an IGDB game ---------- */
+/* ---------- matching a game from an old export file (it only has the RAWG id and a title) to its IGDB game ---------- */
 
 const EDITION_WORDS = /\b(game of the year|goty|deluxe|definitive|complete|remastered|remaster|hd|edition|collection|anniversary|ultimate)\b/g;
 
@@ -342,7 +342,7 @@ const validId = (v: unknown): number | null => (typeof v === "number" && Number.
 
 /* ==================== PURE:END ==================== */
 
-/* ---------------- Cache + per-user limit (same design as the rawg function) ---------------- */
+/* ---------------- Cache + per-user limit (tables keep their historical `rawg_` names) ---------------- */
 
 class RateLimitError extends Error {}
 
