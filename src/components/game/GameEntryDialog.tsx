@@ -49,7 +49,7 @@ export function GameEntryDialog({ target, onClose }: { target: EntryTarget | nul
     if (target.mode === "add") {
       const g = target.game;
       add.mutate(
-        { rawg_id: g.id, name: g.name, cover_url: g.cover, release_year: g.year, platforms: g.platforms, genres: g.genres, ...v },
+        { igdb_id: g.id, name: g.name, cover_url: g.cover, release_year: g.year, platforms: g.platforms, genres: g.genres, ...v },
         { onSuccess: onClose },
       );
     } else {

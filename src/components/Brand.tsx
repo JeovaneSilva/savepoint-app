@@ -33,16 +33,16 @@ export function Logo({ size = 24 }: { size?: number }) {
   );
 }
 
-export function RawgAttribution() {
+export function DataAttribution() {
   return (
     <Text muted style={{ fontSize: 12, textAlign: "center" }}>
       Dados de jogos fornecidos por{" "}
       <Text
         weight="semibold"
-        onPress={() => Linking.openURL("https://rawg.io")}
+        onPress={() => Linking.openURL("https://www.igdb.com")}
         style={{ color: colors.accent, fontSize: 12 }}
       >
-        RAWG
+        IGDB
       </Text>
     </Text>
   );

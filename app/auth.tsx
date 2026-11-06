@@ -6,7 +6,7 @@ import { MailCheck } from "lucide-react-native";
 import { z } from "zod";
 import { Backdrop } from "@/components/Screen";
 import { SignedInRedirect } from "@/components/SignedInRedirect";
-import { Card, Logo, RawgAttribution } from "@/components/Brand";
+import { Card, Logo, DataAttribution } from "@/components/Brand";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { Tabs } from "@/components/ui/Tabs";
@@ -211,7 +211,7 @@ export default function AuthScreen() {
               </View>
             )}
 
-            <RawgAttribution />
+            <DataAttribution />
             <Button variant="ghost" size="sm" onPress={() => router.back()} style={{ alignSelf: "center" }}>
               Voltar ao início
             </Button>

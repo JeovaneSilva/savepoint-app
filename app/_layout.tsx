@@ -72,7 +72,7 @@ export default function RootLayout() {
         persistOptions={{
           persister,
           maxAge: CACHE_MAX_AGE,
-          buster: "v3",
+          buster: "v4",
           dehydrateOptions: { shouldDehydrateQuery: shouldPersist },
         }}
       >

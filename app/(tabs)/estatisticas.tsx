@@ -98,7 +98,7 @@ export default function EstatisticasScreen() {
             {s.lastCompleted.map((g, i) => (
               <Pressable
                 key={g.id}
-                onPress={() => router.push({ pathname: "/jogo/[id]", params: { id: String(g.rawg_id) } })}
+                onPress={() => router.push({ pathname: "/jogo/[id]", params: { id: String(g.igdb_id) } })}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",

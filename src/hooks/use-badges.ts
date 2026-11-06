@@ -72,7 +72,7 @@ export interface PublicBadge {
 }
 
 export interface RecentGame {
-  rawg_id: number;
+  igdb_id: number;
   name: string;
   cover_url: string | null;
   completed_at: string | null;

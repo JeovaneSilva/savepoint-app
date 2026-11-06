@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BarChart3, Library, Search } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { H2, Text } from "@/components/ui/Text";
-import { Logo, RawgAttribution } from "@/components/Brand";
+import { Logo, DataAttribution } from "@/components/Brand";
 import { SignedInRedirect } from "@/components/SignedInRedirect";
 import { useAuth } from "@/hooks/use-auth";
 import { alpha, colors, radius, shadowCard } from "@/theme";
@@ -82,7 +82,7 @@ export default function Landing() {
       </View>
 
       <View style={styles.footer}>
-        <RawgAttribution />
+        <DataAttribution />
       </View>
     </ScrollView>
   );

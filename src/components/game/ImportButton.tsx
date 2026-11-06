@@ -8,33 +8,17 @@ import { Sheet } from "@/components/ui/Sheet";
 import { H2, Text } from "@/components/ui/Text";
 import { toast } from "@/components/ui/Toast";
 import { invalidateDerived, libraryQuery } from "@/hooks/use-library";
-import { parseImport, type ImportRow } from "@/lib/import";
-import { getGameCover } from "@/lib/rawg";
+import { parseImport, toInsert, type ImportRow } from "@/lib/import";
+import { matchGames } from "@/lib/igdb";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/theme";
 
 type Phase =
   | { step: "idle" }
   | { step: "working"; label: string; done: number; total: number }
-  | { step: "done"; imported: number; existing: number; invalid: number; noCover: number };
+  | { step: "done"; imported: number; existing: number; invalid: number; notFound: number };
 
-const CONCURRENCY = 4;
 const CHUNK = 100;
-
-/** Runs `fn` over `items` with a small concurrency limit, reporting progress. */
-async function pool<T>(items: T[], fn: (item: T) => Promise<void>, onProgress: (done: number) => void) {
-  let next = 0;
-  let done = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
-      while (next < items.length) {
-        const item = items[next++] as T;
-        await fn(item);
-        onProgress(++done);
-      }
-    }),
-  );
-}
 
 export function ImportButton({ variant = "outline" }: { variant?: "outline" | "neon" }) {
   const qc = useQueryClient();
@@ -69,36 +53,56 @@ export function ImportButton({ variant = "outline" }: { variant?: "outline" | "n
 
       // Skip games that are already in this account's library.
       const current = await qc.fetchQuery({ ...libraryQuery, staleTime: 0 });
-      const have = new Set(current.map((g) => g.rawg_id));
-      const rows: ImportRow[] = parsed.rows.filter((r) => !have.has(r.rawg_id));
-      const existing = parsed.rows.length - rows.length;
+      const haveIgdb = new Set(current.map((g) => g.igdb_id));
+      let rows: ImportRow[] = parsed.rows.filter((r) => r.igdb_id == null || !haveIgdb.has(r.igdb_id));
+      let existing = parsed.rows.length - rows.length;
 
       if (rows.length === 0) {
-        setPhase({ step: "done", imported: 0, existing, invalid: parsed.invalid, noCover: 0 });
+        setPhase({ step: "done", imported: 0, existing, invalid: parsed.invalid, notFound: 0 });
         return;
       }
 
-      // The export has no cover URLs: fetch them from RAWG by id.
-      let noCover = 0;
-      setPhase({ step: "working", label: "Buscando capas…", done: 0, total: rows.length });
-      await pool(
-        rows,
-        async (row) => {
-          const game = await getGameCover(row.rawg_id);
-          if (game?.cover) {
-            row.cover_url = game.cover;
-            if (!row.release_year) row.release_year = game.year;
-            if (!row.genres?.length) row.genres = game.genres;
-            if (!row.platforms?.length) row.platforms = game.platforms;
-          } else noCover++;
-        },
-        (done) => setPhase({ step: "working", label: "Buscando capas…", done, total: rows.length }),
-      );
+      // Old files only know the RAWG id and have no cover: find each game in IGDB by title (20 per request).
+      const needLookup = rows.filter((r) => r.igdb_id == null || !r.cover_url);
+      let lookupFailed = false;
+      for (let i = 0; i < needLookup.length && !lookupFailed; i += 20) {
+        const batch = needLookup.slice(i, i + 20);
+        setPhase({ step: "working", label: "Procurando os jogos na nova base…", done: i, total: needLookup.length });
+        const { results, error } = await matchGames(
+          batch.map((r) => ({ name: r.name, year: r.release_year ?? null, platforms: r.platforms ?? [] })),
+        );
+        if (error) lookupFailed = true; // keep what was matched so far; the rest is reported as not found
+        for (const m of results) {
+          const row = batch[m.index];
+          if (!row || m.status !== "matched" || !m.best) continue;
+          if (row.igdb_id == null) row.igdb_id = m.best.id;
+          if (row.igdb_id !== m.best.id) continue;
+          row.cover_url ??= m.best.cover;
+          if (!row.release_year) row.release_year = m.best.year;
+          if (!row.genres?.length) row.genres = m.best.genres;
+          if (!row.platforms?.length) row.platforms = m.best.platforms;
+        }
+      }
+
+      // Two file rows (or a row and an existing game) may have resolved to the same IGDB game.
+      const seenIgdb = new Set<number>();
+      rows = rows.filter((r) => {
+        if (r.igdb_id == null) return true;
+        if (haveIgdb.has(r.igdb_id) || seenIgdb.has(r.igdb_id)) {
+          existing++;
+          return false;
+        }
+        seenIgdb.add(r.igdb_id);
+        return true;
+      });
+      // Games that could not be found in IGDB can't be saved: report them instead of importing broken rows.
+      const notFound = rows.filter((r) => r.igdb_id == null).length;
+      const importable = rows.filter((r): r is ImportRow & { igdb_id: number } => r.igdb_id != null).map(toInsert);
 
       let imported = 0;
-      setPhase({ step: "working", label: "Salvando na biblioteca…", done: 0, total: rows.length });
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const chunk = rows.slice(i, i + CHUNK);
+      setPhase({ step: "working", label: "Salvando na biblioteca…", done: 0, total: importable.length });
+      for (let i = 0; i < importable.length; i += CHUNK) {
+        const chunk = importable.slice(i, i + CHUNK);
         const { error } = await supabase.from("user_games").insert(chunk);
         if (error) {
           // Chunk failed (e.g. a duplicate slipped in): fall back to one by one so the rest still import.
@@ -107,11 +111,11 @@ export function ImportButton({ variant = "outline" }: { variant?: "outline" | "n
             if (!e) imported++;
           }
         } else imported += chunk.length;
-        setPhase({ step: "working", label: "Salvando na biblioteca…", done: Math.min(i + CHUNK, rows.length), total: rows.length });
+        setPhase({ step: "working", label: "Salvando na biblioteca…", done: Math.min(i + CHUNK, importable.length), total: importable.length });
       }
 
       invalidateDerived(qc);
-      setPhase({ step: "done", imported, existing, invalid: parsed.invalid + (rows.length - imported), noCover });
+      setPhase({ step: "done", imported, existing, invalid: parsed.invalid + (importable.length - imported), notFound });
     } catch {
       setPhase({ step: "idle" });
       toast.error("Não foi possível importar a lista");
@@ -168,7 +172,9 @@ export function ImportButton({ variant = "outline" }: { variant?: "outline" | "n
                 <Text muted>{`${phase.existing} já estavam na sua biblioteca`}</Text>
               )}
               {phase.invalid > 0 && <Text muted>{`${phase.invalid} não puderam ser lidos`}</Text>}
-              {phase.noCover > 0 && <Text muted>{`${phase.noCover} sem capa (RAWG não respondeu)`}</Text>}
+              {phase.notFound > 0 && (
+                <Text muted>{`${phase.notFound} não foram encontrados na base de jogos e ficaram de fora`}</Text>
+              )}
             </View>
             <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
               <Button variant="neon" onPress={close}>

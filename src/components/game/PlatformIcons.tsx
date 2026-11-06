@@ -1,6 +1,5 @@
 import { View } from "react-native";
 import { Badge } from "@/components/ui/Badge";
-import { PARENT_PLATFORM_SHORT } from "@/lib/games";
 
 export function PlatformIcons({ slugs, max = 5 }: { slugs: string[]; max?: number }) {
   const shown = slugs.slice(0, max);
@@ -9,7 +8,7 @@ export function PlatformIcons({ slugs, max = 5 }: { slugs: string[]; max?: numbe
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
       {shown.map((s) => (
         <Badge key={s} variant="platform">
-          {PARENT_PLATFORM_SHORT[s] ?? s.slice(0, 4).toUpperCase()}
+          {s.length > 6 ? s.slice(0, 6) : s}
         </Badge>
       ))}
       {rest > 0 && <Badge variant="platform">{`+${rest}`}</Badge>}

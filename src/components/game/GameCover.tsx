@@ -3,10 +3,10 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import { Gamepad2 } from "lucide-react-native";
 import { alpha, colors } from "@/theme";
-import { rawgThumb } from "@/lib/games";
+import { igdbThumb } from "@/lib/games";
 
 /**
- * Game artwork with graceful fallbacks: resized RAWG image, then the original,
+ * Game artwork with graceful fallbacks: resized image, then the original,
  * then a placeholder — so a CDN hiccup never shows a broken image.
  */
 export function GameCover({
@@ -18,7 +18,7 @@ export function GameCover({
   w?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  const thumb = rawgThumb(src, w);
+  const thumb = igdbThumb(src, w);
   const [attempt, setAttempt] = useState(0);
   const url = attempt === 0 ? thumb : attempt === 1 && src && src !== thumb ? src : null;
 

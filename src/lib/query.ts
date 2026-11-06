@@ -23,6 +23,6 @@ export function shouldPersist(query: Query): boolean {
   if (query.state.status !== "success") return false;
   const root = query.queryKey[0];
   if (root === "library" || root === "account-status") return true;
-  if (root === "rawg-game") return (query.state.data as { game?: unknown } | undefined)?.game != null;
+  if (root === "game-details") return (query.state.data as { game?: unknown } | undefined)?.game != null;
   return false;
 }

@@ -28,7 +28,7 @@ export type Database = {
           platforms: string[]
           played_on: string | null
           rating: number | null
-          rawg_id: number
+          igdb_id: number
           release_year: number | null
           status: Database["public"]["Enums"]["game_status"]
           updated_at: string
@@ -47,7 +47,7 @@ export type Database = {
           platforms?: string[]
           played_on?: string | null
           rating?: number | null
-          rawg_id: number
+          igdb_id: number
           release_year?: number | null
           status?: Database["public"]["Enums"]["game_status"]
           updated_at?: string
@@ -66,7 +66,7 @@ export type Database = {
           platforms?: string[]
           played_on?: string | null
           rating?: number | null
-          rawg_id?: number
+          igdb_id?: number
           release_year?: number | null
           status?: Database["public"]["Enums"]["game_status"]
           updated_at?: string
@@ -168,7 +168,7 @@ export type Database = {
       get_profile_recent: {
         Args: { p_nickname: string }
         Returns: {
-          rawg_id: number
+          igdb_id: number
           name: string
           cover_url: string | null
           completed_at: string | null

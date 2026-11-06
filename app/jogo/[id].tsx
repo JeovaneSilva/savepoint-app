@@ -17,31 +17,31 @@ import { GameEntryForm, type EntryValues } from "@/components/game/GameEntryForm
 import { RemoveGameButton } from "@/components/game/RemoveGameButton";
 import { StatusBadge } from "@/components/game/StatusBadge";
 import { libraryQuery, useAddGame, useUpdateGame } from "@/hooks/use-library";
-import { getGameDetails, type DetailsResponse } from "@/lib/rawg";
-import { rawgThumb, type GameDetails, type UserGame } from "@/lib/games";
+import { getGameDetails, type DetailsResponse } from "@/lib/igdb";
+import { igdbThumb, type GameDetails, type UserGame } from "@/lib/games";
 import { alpha, colors, radius, shadowGlow } from "@/theme";
 
 export default function GameScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const rawgId = Number(id);
+  const gameId = Number(id);
   const insets = useSafeAreaInsets();
   const [shot, setShot] = useState<string | null>(null);
 
   const { data: library } = useQuery(libraryQuery);
-  const entry = library?.find((g) => g.rawg_id === rawgId);
+  const entry = library?.find((g) => g.igdb_id === gameId);
 
   // Games already in the library open instantly with what is stored; the rest loads in the background.
   const placeholder: DetailsResponse | undefined = entry
     ? {
         game: {
-          id: entry.rawg_id,
+          id: gameId,
           name: entry.name,
           cover: entry.cover_url,
           year: entry.release_year,
           platforms: entry.platforms,
           parentPlatforms: [],
           genres: entry.genres,
-          metacritic: null,
+          criticScore: null,
           released: null,
           description: "",
           developers: [],
@@ -53,14 +53,14 @@ export default function GameScreen() {
     : undefined;
 
   const details = useQuery({
-    queryKey: ["rawg-game", rawgId],
+    queryKey: ["game-details", gameId],
     queryFn: async () => {
-      const res = await getGameDetails(rawgId);
+      const res = await getGameDetails(gameId);
       // Throw on transient failures so they are neither cached nor saved on the device.
-      if (res.error === "unavailable" || res.error === "quota" || res.error === "rate_limited") throw new Error(res.error);
+      if (res.error === "unavailable" || res.error === "rate_limited") throw new Error(res.error);
       return res;
     },
-    enabled: Number.isInteger(rawgId) && rawgId > 0,
+    enabled: Number.isInteger(gameId) && gameId > 0,
     staleTime: 30 * 24 * 60 * 60 * 1000, // details rarely change; also cached on the device
     retry: false,
     ...(placeholder ? { placeholderData: placeholder } : {}),
@@ -90,13 +90,7 @@ export default function GameScreen() {
           </View>
         ) : !g ? (
           <View style={{ paddingHorizontal: 16 }}>
-            {details.isError && details.error.message === "quota" ? (
-              <EmptyState
-                icon={<Ghost size={40} color={colors.statusWant} />}
-                title="Limite mensal da base de jogos atingido"
-                text="Os detalhes de jogos novos voltam no mês que vem. Jogos já abertos continuam disponíveis."
-              />
-            ) : details.isError && details.error.message === "rate_limited" ? (
+            {details.isError && details.error.message === "rate_limited" ? (
               <EmptyState
                 icon={<Ghost size={40} color={colors.statusWant} />}
                 title="Muitas consultas em pouco tempo"
@@ -156,7 +150,7 @@ export default function GameScreen() {
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
                   {g.year != null && <Text weight="semibold">{String(g.year)}</Text>}
-                  {g.metacritic != null && <Badge variant="concluido">{`Metacritic ${g.metacritic}`}</Badge>}
+                  {g.criticScore != null && <Badge variant="concluido">{`Crítica ${g.criticScore}`}</Badge>}
                   {g.genres.map((x) => (
                     <Badge key={x} variant="neon">
                       {x}
@@ -217,7 +211,7 @@ export default function GameScreen() {
                     {g.screenshots.map((s) => (
                       <Pressable key={s} onPress={() => setShot(s)} style={{ width: "48.5%" }}>
                         <Image
-                          source={{ uri: rawgThumb(s, 640) ?? s }}
+                          source={{ uri: igdbThumb(s, 640) ?? s }}
                           contentFit="cover"
                           transition={250}
                           accessibilityLabel={`Screenshot de ${g.name}`}
@@ -245,7 +239,7 @@ export default function GameScreen() {
                   <H2>{entry ? "Meus dados" : "Adicionar à biblioteca"}</H2>
                   {entry && <RemoveGameButton game={entry} withLabel onRemoved={back} />}
                 </View>
-                <MyDataForm key={entry?.id ?? "new"} rawg={g} entry={entry} />
+                <MyDataForm key={entry?.id ?? "new"} game={g} entry={entry} />
               </View>
             </View>
           </>
@@ -279,7 +273,7 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MyDataForm({ rawg, entry }: { rawg: GameDetails; entry: UserGame | undefined }) {
+function MyDataForm({ game, entry }: { game: GameDetails; entry: UserGame | undefined }) {
   const add = useAddGame();
   const update = useUpdateGame();
   const initial: EntryValues = entry
@@ -305,7 +299,7 @@ function MyDataForm({ rawg, entry }: { rawg: GameDetails; entry: UserGame | unde
   return (
     <GameEntryForm
       initial={initial}
-      platforms={rawg.platforms}
+      platforms={game.platforms}
       submitLabel={entry ? "Salvar alterações" : "Adicionar"}
       pending={add.isPending || update.isPending}
       onSubmit={(v) => {
@@ -313,12 +307,12 @@ function MyDataForm({ rawg, entry }: { rawg: GameDetails; entry: UserGame | unde
           update.mutate({ id: entry.id, patch: v });
         } else {
           add.mutate({
-            rawg_id: rawg.id,
-            name: rawg.name,
-            cover_url: rawg.cover,
-            release_year: rawg.year,
-            platforms: rawg.platforms,
-            genres: rawg.genres,
+            igdb_id: game.id,
+            name: game.name,
+            cover_url: game.cover,
+            release_year: game.year,
+            platforms: game.platforms,
+            genres: game.genres,
             ...v,
           });
         }

@@ -39,11 +39,11 @@ export function useLibrary() {
   return useQuery(libraryQuery);
 }
 
-/** Map of rawg_id -> library entry, used for "already in your library" badges. */
+/** Map of igdb_id -> library entry, used for "already in your library" badges. */
 export function useLibraryMap() {
   const { data } = useQuery(libraryQuery);
   const map = new Map<number, UserGame>();
-  for (const g of data ?? []) map.set(g.rawg_id, g);
+  for (const g of data ?? []) map.set(g.igdb_id, g);
   return map;
 }
 

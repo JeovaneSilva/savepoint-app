@@ -21,16 +21,19 @@ export const STATUS_TAB_LABEL: Record<GameStatus, string> = {
   abandonado: "Abandonados",
 };
 
-/** Shape returned by the game search (RAWG proxy). */
+/** Shape returned by the game search (IGDB proxy). */
 export interface GameSummary {
+  /** IGDB id. */
   id: number;
   name: string;
   cover: string | null;
   year: number | null;
   platforms: string[];
+  /** Short platform labels shown as chips (PS5, PC, SNES...). */
   parentPlatforms: string[];
   genres: string[];
-  metacritic: number | null;
+  /** Critics' score 0-100 (IGDB aggregated rating), when known. */
+  criticScore: number | null;
 }
 
 export interface GameDetails extends GameSummary {
@@ -53,23 +56,6 @@ export const PLATFORM_GROUPS: { value: PlatformGroup; label: string }[] = [
 ];
 
 export const DECADES = [1970, 1980, 1990, 2000, 2010, 2020] as const;
-
-/** RAWG parent platform ids. */
-const PARENT_PLATFORM_ID: Record<Exclude<PlatformGroup, "retro">, number> = {
-  pc: 1,
-  playstation: 2,
-  xbox: 3,
-  nintendo: 7,
-};
-
-/**
- * RAWG platform ids considered retro/classic: Atari 2600/5200/7800, NES, SNES,
- * N64, Game Boy, GBC, GBA, GameCube, PS1, PS2, original Xbox, Master System,
- * Genesis, Game Gear, Saturn, Dreamcast, Neo Geo, Commodore/Amiga.
- */
-export const RETRO_PLATFORM_IDS = [
-  23, 31, 28, 49, 79, 83, 26, 43, 24, 105, 27, 15, 80, 74, 167, 77, 107, 106, 12, 166,
-];
 
 export interface SearchFilters {
   search: string;
@@ -96,75 +82,15 @@ export function isTrendingMode(f: Pick<SearchFilters, "search">): boolean {
   return !effectiveSearch(f.search);
 }
 
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/** Builds the query params sent to RAWG /games for a given set of filters. */
-export function buildSearchParams(f: SearchFilters, now: Date = new Date()): Record<string, string> {
-  const trending = isTrendingMode(f);
-  const params: Record<string, string> = {
-    page: trending ? "1" : String(Math.max(1, Math.floor(f.page))),
-    page_size: String(trending ? TRENDING_SIZE : PAGE_SIZE),
-  };
-  if (trending) {
-    // Most-added games; without a decade, limited to the last 12 months = "em alta".
-    params["ordering"] = "-added";
-    if (!f.decade) {
-      const from = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      params["dates"] = `${isoDay(from)},${isoDay(now)}`;
-    }
-  } else {
-    params["search"] = effectiveSearch(f.search);
-  }
-  if (f.platform === "retro") {
-    params["platforms"] = RETRO_PLATFORM_IDS.join(",");
-    // Retro games are old by definition: drop the "last 12 months" window.
-    if (trending && !f.decade) delete params["dates"];
-  } else if (f.platform) {
-    params["parent_platforms"] = String(PARENT_PLATFORM_ID[f.platform]);
-  }
-  if (f.decade) {
-    params["dates"] = `${f.decade}-01-01,${f.decade + 9}-12-31`;
-  }
-  return params;
-}
-
-/** Short labels for RAWG parent platform slugs, used as compact icons. */
-export const PARENT_PLATFORM_SHORT: Record<string, string> = {
-  pc: "PC",
-  playstation: "PS",
-  xbox: "XB",
-  nintendo: "NIN",
-  mac: "MAC",
-  linux: "LNX",
-  ios: "iOS",
-  android: "AND",
-  atari: "ATR",
-  "commodore-amiga": "AMG",
-  sega: "SEGA",
-  "3do": "3DO",
-  "neo-geo": "NEO",
-  web: "WEB",
-};
-
-/** Smaller RAWG image variant to keep grids fast. */
-/** Widths RAWG's image CDN actually serves (other sizes redirect to a 404). */
-export const RAWG_THUMB_WIDTHS = [420, 640, 1280] as const;
-
 /**
- * Smaller RAWG image for the given display width. Uses RAWG's "resize" endpoint
- * (keeps aspect ratio; CSS object-cover does the cropping) snapped to a supported width.
+ * IGDB image URLs carry a size token (t_720p). Swap it for the size the screen needs:
+ * t_thumb (90x90 crop), t_screenshot_med (569x320), t_screenshot_big (889x500), t_720p (up to 1280x720, keeps ratio).
  */
-export function rawgThumb(url: string | null | undefined, width = 640): string | null {
+export function igdbThumb(url: string | null | undefined, width = 640): string | null {
   if (!url) return null;
-  const w = RAWG_THUMB_WIDTHS.find((x) => x >= width) ?? RAWG_THUMB_WIDTHS[RAWG_THUMB_WIDTHS.length - 1];
-  if (!url.includes("media.rawg.io/media/") || url.includes("/media/resize/") || url.includes("/media/crop/")) {
-    return url;
-  }
-  return url
-    .replace("/media/games/", `/media/resize/${w}/-/games/`)
-    .replace("/media/screenshots/", `/media/resize/${w}/-/screenshots/`);
+  if (!url.includes("images.igdb.com/igdb/image/upload/")) return url;
+  const size = width <= 100 ? "t_thumb" : width <= 640 ? "t_screenshot_med" : width <= 1000 ? "t_screenshot_big" : "t_720p";
+  return url.replace(/\/t_[a-z0-9_]+\//, `/${size}/`);
 }
 
 /* ---------- Library helpers ---------- */
@@ -301,7 +227,8 @@ const EXPORT_FIELDS = [
   "genres",
   "platforms",
   "notes",
-  "rawg_id",
+  "igdb_id",
+  "cover_url",
   "created_at",
 ] as const;
 

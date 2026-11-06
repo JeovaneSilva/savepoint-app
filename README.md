@@ -1,7 +1,7 @@
 # SavePoint (app)
 
 App mobile (Expo + React Native + TypeScript) para registrar os jogos que você zerou, está jogando ou quer jogar.
-Backend: Supabase. Dados dos jogos: [RAWG](https://rawg.io).
+Backend: Supabase. Dados dos jogos: [IGDB](https://www.igdb.com) (Twitch).
 
 ## Rodando
 
@@ -24,23 +24,20 @@ Escaneie o QR code com o **Expo Go** ou use `npm run android` / `npm run ios` / 
    - `supabase/migrations/0005_avatars_read_policy.sql` (permite substituir a foto de perfil)
    - `supabase/migrations/0006_harder_badges.sql` (quadro de selos mais difícil; recalcula todos os selos)
    - `supabase/migrations/0007_account_approval.sql` (aprovação manual de contas)
-   - `supabase/migrations/0008_rawg_user_limit.sql` (limite de buscas por usuário na RAWG)
-2. **Busca de jogos:** a chave da RAWG fica numa Edge Function, nunca no app.
-
-```bash
-npm i -g supabase            # ou use: npx supabase ...
-supabase login
-supabase link --project-ref <seu-project-ref>
-supabase secrets set RAWG_API_KEY=<sua chave da RAWG>
-supabase functions deploy rawg
-```
-
-Chave gratuita da RAWG: https://rawg.io/apidocs
+   - `supabase/migrations/0008_rawg_user_limit.sql` (limite de buscas por usuário)
+   - `supabase/migrations/0009_igdb.sql` (coluna `igdb_id`)
+   - `supabase/migrations/0010_fresh_start.sql` (**apaga todas as bibliotecas** e deixa os jogos identificados só pelo id da IGDB; as contas ficam)
+2. **Busca de jogos (IGDB):** as credenciais da Twitch ficam numa Edge Function, nunca no app.
+   - Crie um aplicativo em https://dev.twitch.tv/console (a conta Twitch precisa de verificação em duas etapas) e copie o
+     **Client ID** e o **Client Secret**.
+   - Em *Edge Functions → Secrets* do Supabase, crie `TWITCH_CLIENT_ID` e `TWITCH_CLIENT_SECRET`.
+   - Publique a função `igdb` com o conteúdo de `supabase/functions/igdb/index.ts` (*Edge Functions → Deploy a new function → Via Editor*).
+   - Listas exportadas antes da troca (que só têm o id da RAWG) ainda podem ser importadas: o app procura cada jogo na IGDB pelo título.
 
 ## Aprovação de contas
 
 Toda conta nova nasce **pendente**: o app mostra "aguardando aprovação" e o banco não entrega nenhum dado
-(nem a busca da RAWG responde) até um administrador aprovar.
+(nem a busca de jogos responde) até um administrador aprovar.
 
 1. Rode a migration `0007`. Quem já tinha conta é aprovado automaticamente.
 2. Torne-se administrador (uma vez), trocando o email:
@@ -48,7 +45,7 @@ Toda conta nova nasce **pendente**: o app mostra "aguardando aprovação" e o ba
    INSERT INTO public.app_admins (user_id)
    SELECT id FROM auth.users WHERE email = 'SEU_EMAIL_AQUI' ON CONFLICT DO NOTHING;
    ```
-3. Publique de novo a Edge Function `rawg` (ela agora confere a aprovação).
+3. Publique a Edge Function `igdb` (ela confere a aprovação de quem chama).
 4. No app: **Meu perfil → Aprovar contas** (um ponto vermelho no seu avatar avisa quando há pendências).
 
 Sem o app, também dá para aprovar no painel: **Table Editor → `account_approvals` → coluna `status`** (`approved`, `pending`, `blocked`).
@@ -81,19 +78,21 @@ O APK é o instalador que você manda para os amigos. Usa o EAS Build (Expo), qu
 Cada mudança no app exige um novo build (o plano gratuito tem limite mensal de builds). Os perfis estão em `eas.json`:
 `preview` gera APK para instalar direto; `production` gera AAB, que é o formato da Play Store.
 
-## Limites da busca de jogos (RAWG)
+## Limites da busca de jogos (IGDB)
 
-A Edge Function `rawg` protege a cota gratuita da RAWG (20 mil requisições por mês):
-- cache compartilhado (respostas do cache não contam);
-- **limite por usuário**: 300 requisições reais à RAWG por hora (cache hit é grátis). Ajuste com o secret `RAWG_USER_HOURLY_LIMIT`;
-- **limite mensal**: 18.000 (secret `RAWG_MONTHLY_LIMIT`);
+A Edge Function `igdb` protege a API (a IGDB aceita cerca de 4 requisições por segundo no uso gratuito, não comercial):
+- cache compartilhado no Supabase (respostas do cache não consomem a API; em falha da IGDB, serve a cópia guardada);
+- **limite por usuário**: 300 requisições reais à IGDB por hora (cache hit é grátis). Ajuste com o secret `IGDB_USER_HOURLY_LIMIT`;
+- limite de 8 s por chamada e pausa de 1 minuto depois de 3 falhas seguidas, para o app responder rápido quando a IGDB cai;
 - os parâmetros de busca são validados; entradas fora do padrão recebem erro 400.
+
+A função `rawg` (`supabase/functions/rawg`) é a versão antiga e pode ser apagada depois da migração.
 
 ## Estrutura
 
 - `app/` — rotas (Expo Router): landing, login, abas (Buscar, Biblioteca, Estatísticas) e detalhe do jogo
 - `src/components/` — UI (`ui/`), componentes de jogo (`game/`), gráficos
 - `src/hooks/` — auth e biblioteca (React Query + Supabase)
-- `src/lib/` — cliente Supabase, RAWG, regras de negócio (`games.ts`)
+- `src/lib/` — cliente Supabase, IGDB, regras de negócio (`games.ts`)
 - `src/theme.ts` — tokens de design (tema escuro roxo neon/ciano do SavePoint)
-- `supabase/` — migration SQL e Edge Function `rawg`
+- `supabase/` — migrations SQL e Edge Functions (`igdb`; `rawg` é a antiga)

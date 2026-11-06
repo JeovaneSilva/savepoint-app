@@ -13,7 +13,7 @@ import { StatusBadge } from "./StatusBadge";
 import { alpha, colors, radius, shadowCard } from "@/theme";
 import type { GameStatus, GameSummary, UserGame } from "@/lib/games";
 
-const openGame = (rawgId: number) => router.push({ pathname: "/jogo/[id]", params: { id: String(rawgId) } });
+const openGame = (igdbId: number) => router.push({ pathname: "/jogo/[id]", params: { id: String(igdbId) } });
 
 function formatDate(d: string | null) {
   if (!d) return null;
@@ -50,10 +50,10 @@ export function SearchGameCard({
     <View style={styles.card}>
       <Pressable onPress={() => openGame(game.id)} accessibilityLabel={`Ver ${game.name}`}>
         <CardCover src={game.cover}>
-          {game.metacritic != null && (
+          {game.criticScore != null && (
             <View style={styles.metacritic}>
               <Text display weight="bold" style={{ fontSize: 12, color: colors.statusDone }}>
-                {String(game.metacritic)}
+                {String(game.criticScore)}
               </Text>
             </View>
           )}
@@ -112,13 +112,13 @@ interface LibProps {
 export function LibraryGameCard({ game, onEdit }: LibProps) {
   return (
     <View style={styles.card}>
-      <Pressable onPress={() => openGame(game.rawg_id)} accessibilityLabel={`Ver ${game.name}`}>
+      <Pressable onPress={() => openGame(game.igdb_id)} accessibilityLabel={`Ver ${game.name}`}>
         <CardCover src={game.cover_url}>
           <StatusBadge status={game.status} overlay style={{ position: "absolute", left: 8, top: 8 }} />
         </CardCover>
       </Pressable>
       <View style={[styles.body, { gap: 6 }]}>
-        <Text weight="semibold" numberOfLines={2} onPress={() => openGame(game.rawg_id)} style={{ fontSize: 14, lineHeight: 19 }}>
+        <Text weight="semibold" numberOfLines={2} onPress={() => openGame(game.igdb_id)} style={{ fontSize: 14, lineHeight: 19 }}>
           {game.name}
         </Text>
         <Text muted numberOfLines={1} style={{ fontSize: 12 }}>
@@ -146,11 +146,11 @@ export function LibraryGameCard({ game, onEdit }: LibProps) {
 export function LibraryGameRow({ game, onEdit }: LibProps) {
   return (
     <View style={styles.row}>
-      <Pressable onPress={() => openGame(game.rawg_id)}>
+      <Pressable onPress={() => openGame(game.igdb_id)}>
         <GameCover src={game.cover_url} w={200} style={{ width: 64, height: 64, borderRadius: radius.lg }} />
       </Pressable>
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        <Text weight="semibold" numberOfLines={1} onPress={() => openGame(game.rawg_id)}>
+        <Text weight="semibold" numberOfLines={1} onPress={() => openGame(game.igdb_id)}>
           {game.name}
         </Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 10, rowGap: 4 }}>

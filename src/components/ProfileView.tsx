@@ -215,8 +215,8 @@ export function ProfileView({ nickname }: { nickname: string }) {
                 <View style={{ gap: 8 }}>
                   {(recent.data ?? []).map((g) => (
                     <Pressable
-                      key={g.rawg_id}
-                      onPress={() => router.push({ pathname: "/jogo/[id]", params: { id: String(g.rawg_id) } })}
+                      key={g.igdb_id}
+                      onPress={() => router.push({ pathname: "/jogo/[id]", params: { id: String(g.igdb_id) } })}
                       style={{
                         flexDirection: "row",
                         alignItems: "center",

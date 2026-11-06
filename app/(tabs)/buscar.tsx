@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, View } from "react-native";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { Flame, Ghost, KeyRound, Search, X } from "lucide-react-native";
 import { Backdrop } from "@/components/Screen";
-import { EmptyState, RawgAttribution } from "@/components/Brand";
+import { EmptyState, DataAttribution } from "@/components/Brand";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -13,7 +13,7 @@ import { GameCardSkeleton, SearchGameCard } from "@/components/game/GameCards";
 import { GameEntryDialog, type EntryTarget } from "@/components/game/GameEntryDialog";
 import { useDebounced } from "@/hooks/use-debounced";
 import { useLibraryMap } from "@/hooks/use-library";
-import { searchGames } from "@/lib/rawg";
+import { searchGames } from "@/lib/igdb";
 import { DECADES, PLATFORM_GROUPS, TRENDING_SIZE, effectiveSearch, type GameSummary, type PlatformGroup } from "@/lib/games";
 import { colors } from "@/theme";
 
@@ -30,7 +30,7 @@ export default function BuscarScreen() {
   const library = useLibraryMap();
 
   const q = useInfiniteQuery({
-    queryKey: ["rawg-search", search, platform, decade],
+    queryKey: ["game-search", search, platform, decade],
     initialPageParam: 1,
     queryFn: ({ pageParam }) => searchGames({ search, platform, decade, page: pageParam }),
     getNextPageParam: (last, all) => (last.hasMore && !last.error ? all.length + 1 : undefined),
@@ -110,12 +110,6 @@ export default function BuscarScreen() {
           title="A busca ainda não está ativada"
           text="Falta conectar a chave da base de jogos. Assim que ela for adicionada, a busca funciona aqui."
         />
-      ) : error === "quota" ? (
-        <EmptyState
-          icon={<Ghost size={40} color={colors.statusWant} />}
-          title="Limite mensal da base de jogos atingido"
-          text="Novas buscas voltam no mês que vem. Jogos já consultados continuam disponíveis."
-        />
       ) : error === "rate_limited" ? (
         <EmptyState
           icon={<Ghost size={40} color={colors.statusWant} />}
@@ -180,7 +174,7 @@ export default function BuscarScreen() {
         ListFooterComponent={
           <View style={{ paddingTop: 12, gap: 16, alignItems: "center" }}>
             {q.isFetchingNextPage && <ActivityIndicator color={colors.mutedForeground} />}
-            <RawgAttribution />
+            <DataAttribution />
           </View>
         }
       />
