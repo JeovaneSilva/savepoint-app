@@ -82,14 +82,40 @@ export function isTrendingMode(f: Pick<SearchFilters, "search">): boolean {
   return !effectiveSearch(f.search);
 }
 
+/** The "#r=<width/height>" hint the igdb function adds to image URLs (the real aspect ratio), if present. */
+export function imageRatio(url: string | null | undefined): number | null {
+  const m = url?.match(/[#&]r=([\d.]+)/);
+  const r = m ? Number(m[1]) : NaN;
+  return Number.isFinite(r) && r > 0 ? r : null;
+}
+
 /**
- * IGDB image URLs carry a size token (t_720p). Swap it for the size the screen needs:
- * t_thumb (90x90 crop), t_screenshot_med (569x320), t_screenshot_big (889x500), t_720p (up to 1280x720, keeps ratio).
+ * Version of the image-selection rules (kept in sync with IMAGE_V in the igdb function). Covers saved by an older version
+ * are refreshed automatically.
+ */
+export const IMAGE_VERSION = 3;
+
+/** True when a saved cover was chosen by older rules (or is missing) and should be looked up again. */
+export const needsCoverRefresh = (url: string | null | undefined): boolean =>
+  !new RegExp(`[#&]v=${IMAGE_VERSION}(&|$)`).test(url ?? "");
+
+/** Is this image roughly 16:9? Anything else (posters, squares) should be shown whole, not cropped to a wide card. */
+export const isLandscapeRatio = (r: number | null): boolean => r == null || (r >= 1.35 && r <= 2.4);
+
+/**
+ * IGDB image URLs carry a size token (t_720p). Swap it for the size the screen needs. Covers are 3:4 posters: the
+ * cover sizes keep that exact shape (t_cover_big 264x352, t_cover_big_2x 528x704); t_720p keeps any aspect ratio.
  */
 export function igdbThumb(url: string | null | undefined, width = 640): string | null {
   if (!url) return null;
   if (!url.includes("images.igdb.com/igdb/image/upload/")) return url;
-  const size = width <= 100 ? "t_thumb" : width <= 640 ? "t_screenshot_med" : width <= 1000 ? "t_screenshot_big" : "t_720p";
+  const ratio = imageRatio(url);
+  const poster = ratio != null && ratio < 0.95;
+  let size = "t_720p";
+  if (width <= 100) size = "t_thumb";
+  else if (poster && width <= 260) size = "t_cover_big";
+  else if (poster && width <= 1000) size = "t_cover_big_2x";
+  else if (width <= 1000 && ratio != null && ratio >= 1.4 && ratio <= 2.4) size = width <= 640 ? "t_screenshot_med" : "t_screenshot_big";
   return url.replace(/\/t_[a-z0-9_]+\//, `/${size}/`);
 }
 

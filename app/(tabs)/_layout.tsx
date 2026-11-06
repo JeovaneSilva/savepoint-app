@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { useAccountStatus, usePendingCount } from "@/hooks/use-account";
 import { useBadgeWatcher } from "@/hooks/use-badges";
 import { useSignOut } from "@/hooks/use-auth";
+import { useLibrary, useRefreshStaleCovers } from "@/hooks/use-library";
 import { useProfile } from "@/hooks/use-profile";
 import { alpha, colors, fonts } from "@/theme";
 
@@ -16,6 +17,7 @@ export default function TabsLayout() {
   const signOut = useSignOut();
   const { data: profile, isPending } = useProfile();
   useBadgeWatcher();
+  useRefreshStaleCovers(useLibrary().data);
   const account = useAccountStatus();
   const pendingAccounts = usePendingCount(!!account.data?.is_admin);
 

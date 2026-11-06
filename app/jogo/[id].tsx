@@ -18,7 +18,7 @@ import { RemoveGameButton } from "@/components/game/RemoveGameButton";
 import { StatusBadge } from "@/components/game/StatusBadge";
 import { libraryQuery, useAddGame, useUpdateGame } from "@/hooks/use-library";
 import { getGameDetails, type DetailsResponse } from "@/lib/igdb";
-import { igdbThumb, type GameDetails, type UserGame } from "@/lib/games";
+import { IMAGE_VERSION, igdbThumb, type GameDetails, type UserGame } from "@/lib/games";
 import { alpha, colors, radius, shadowGlow } from "@/theme";
 
 export default function GameScreen() {
@@ -53,7 +53,7 @@ export default function GameScreen() {
     : undefined;
 
   const details = useQuery({
-    queryKey: ["game-details", gameId],
+    queryKey: ["game-details", gameId, IMAGE_VERSION], // a new image version never reuses details saved on the device
     queryFn: async () => {
       const res = await getGameDetails(gameId);
       // Throw on transient failures so they are neither cached nor saved on the device.
@@ -84,7 +84,7 @@ export default function GameScreen() {
 
         {details.isPending ? (
           <View style={{ paddingHorizontal: 16, gap: 16 }}>
-            <Skeleton width="100%" style={{ aspectRatio: 16 / 9 }} radius={radius["2xl"]} />
+            <Skeleton width="100%" style={{ aspectRatio: 4 / 3 }} radius={radius["2xl"]} />
             <Skeleton width="50%" height={32} />
             <Skeleton width="100%" height={128} />
           </View>
@@ -135,8 +135,8 @@ export default function GameScreen() {
           <>
             {/* Hero */}
             <View style={{ marginHorizontal: 16, borderRadius: radius["2xl"], overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}>
-              <View style={{ aspectRatio: 16 / 9 }}>
-                <GameCover src={g.cover} w={1280} style={StyleSheet.absoluteFill} />
+              <View style={{ aspectRatio: 4 / 3 }}>
+                <GameCover src={g.cover} w={1280} wide style={StyleSheet.absoluteFill} />
                 <LinearGradient
                   colors={["transparent", alpha(colors.background, 0.7), colors.background]}
                   locations={[0.3, 0.75, 1]}

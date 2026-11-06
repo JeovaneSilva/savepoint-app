@@ -1,7 +1,9 @@
+import { useEffect, useRef } from "react";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/Toast";
+import { fetchCovers } from "@/lib/igdb";
 import { supabase } from "@/lib/supabase";
-import type { UserGame, UserGameInsert, UserGameUpdate } from "@/lib/games";
+import { needsCoverRefresh, type UserGame, type UserGameInsert, type UserGameUpdate } from "@/lib/games";
 
 /** Library changes can unlock badges and move the ranking / public profile numbers. */
 export function invalidateDerived(qc: ReturnType<typeof useQueryClient>) {
@@ -95,4 +97,37 @@ export function useRemoveGame() {
     },
     onError: () => toast.error("Não foi possível remover o jogo"),
   });
+}
+
+/**
+ * Covers saved before the current image rules (or with no cover) are looked up again, once per app session and in one
+ * request, so a library fixes itself after the rules improve. Failures are ignored: the old cover just stays.
+ */
+export function useRefreshStaleCovers(games: UserGame[] | undefined) {
+  const qc = useQueryClient();
+  const tried = useRef(new Set<number>());
+
+  useEffect(() => {
+    if (!games?.length) return;
+    const batch = games.filter((g) => needsCoverRefresh(g.cover_url) && !tried.current.has(g.igdb_id)).slice(0, 50);
+    if (batch.length === 0) return;
+    for (const g of batch) tried.current.add(g.igdb_id);
+
+    let cancelled = false;
+    (async () => {
+      const images = await fetchCovers(batch.map((g) => g.igdb_id));
+      let changed = false;
+      for (const img of images) {
+        if (!img.cover) continue;
+        for (const g of batch.filter((x) => x.igdb_id === img.id)) {
+          const { error } = await supabase.from("user_games").update({ cover_url: img.cover }).eq("id", g.id);
+          if (!error) changed = true;
+        }
+      }
+      if (changed && !cancelled) qc.invalidateQueries({ queryKey: ["library"] });
+    })().catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [games, qc]);
 }

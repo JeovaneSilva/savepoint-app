@@ -10,6 +10,7 @@
 //   search   { search?, platform?, decade?, page }   list/search games
 //   details  { id }                                  one game with description, companies, screenshots
 //   match    { items: [{ name, year?, platforms? }] } find the IGDB game for each title (importer of old files)
+//   images   { ids: [igdbId, ...up to 50] }          official cover for saved games (refreshes old covers)
 //
 // Never calls IGDB more than needed: fresh cache hits are free, stale cache is served if IGDB is failing,
 // calls have an 8s timeout and a short circuit breaker.
@@ -25,7 +26,7 @@ const USER_HOURLY_LIMIT = Number(Deno.env.get("IGDB_USER_HOURLY_LIMIT") ?? Deno.
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 /** Bump when the shape of cached answers changes, so older cached copies are ignored. */
-const CACHE_V = "v2";
+const CACHE_V = "v6";
 const TTL = { trending: 6 * HOUR, search: DAY, game: 30 * DAY, find: 30 * DAY };
 
 const CORS = {
@@ -39,14 +40,14 @@ const admin = supabaseUrl && serviceKey ? createClient(supabaseUrl, serviceKey, 
 
 /* ==================== PURE:START (no Deno/network APIs below: unit-tested in Node) ==================== */
 
-interface IgdbImage { image_id?: string }
+interface IgdbImage { image_id?: string; width?: number; height?: number; alpha_channel?: boolean }
 interface IgdbGame {
   id: number;
   name: string;
   first_release_date?: number;
   cover?: IgdbImage;
-  artworks?: IgdbImage[];
   screenshots?: IgdbImage[];
+  artworks?: IgdbImage[]; // details only: extra gallery images
   genres?: { name: string }[];
   platforms?: { id?: number; name: string; abbreviation?: string }[];
   aggregated_rating?: number;
@@ -72,11 +73,14 @@ const DECADES = [1970, 1980, 1990, 2000, 2010, 2020];
 
 const PAGE_SIZE = 12;
 const LIST_FIELDS =
-  "name,first_release_date,cover.image_id,artworks.image_id,screenshots.image_id,genres.name,platforms.id,platforms.name,platforms.abbreviation,aggregated_rating,total_rating_count";
+  "name,first_release_date,cover.image_id,cover.width,cover.height,screenshots.image_id,screenshots.width,screenshots.height,genres.name,platforms.id,platforms.name,platforms.abbreviation,aggregated_rating,total_rating_count";
 const DETAIL_FIELDS =
   LIST_FIELDS + ",summary,involved_companies.developer,involved_companies.publisher,involved_companies.company.name";
 /** Website fields vary between IGDB API revisions: the function tries these in order until one is accepted. */
 const WEBSITE_VARIANTS = [",websites.url,websites.category", ",websites.url", ""];
+/** Promo art for the gallery (never for the cover). alpha_channel marks logos/cut-outs, which are left out. */
+const ART_FIELDS = ",artworks.image_id,artworks.width,artworks.height,artworks.alpha_channel";
+const DETAIL_EXTRAS = [...WEBSITE_VARIANTS.map((w) => ART_FIELDS + w), ...WEBSITE_VARIANTS];
 
 /** Names shown in the app: keep the short ones the library already uses (they came from RAWG). */
 const DISPLAY_PLATFORM: Record<string, string> = {
@@ -137,13 +141,29 @@ const DISPLAY_GENRE: Record<string, string> = {
 };
 const displayGenre = (name: string): string => DISPLAY_GENRE[name] ?? name;
 
-/** Image URLs keep a size token (t_720p) that the app swaps for the size it needs. */
-const imageUrl = (id: string | undefined | null): string | null =>
-  id ? `https://images.igdb.com/igdb/image/upload/t_720p/${id}.jpg` : null;
+/** Bump when the way images are chosen changes: libraries then refresh the covers they saved earlier. */
+const IMAGE_V = 3;
 
-/** Cards are landscape: prefer promo art, then a screenshot, then the (portrait) cover. */
+/**
+ * Image URLs keep a size token (t_720p) that the app swaps for the size it needs, and a hint "#r=<width/height>&v=<n>"
+ * with the real aspect ratio and the selection version.
+ */
+const imageUrl = (i: IgdbImage | undefined | null): string | null => {
+  if (!i?.image_id) return null;
+  const hint = [i.width && i.height ? `r=${(i.width / i.height).toFixed(2)}` : "", `v=${IMAGE_V}`].filter(Boolean).join("&");
+  return `https://images.igdb.com/igdb/image/upload/t_720p/${i.image_id}.jpg#${hint}`;
+};
+
+/**
+ * Always the official cover (box art), so a game looks the same in search, library and details. Only a game that has no
+ * cover in IGDB falls back to a regular landscape screenshot.
+ */
 function bestImage(g: IgdbGame): string | null {
-  return imageUrl(g.artworks?.[0]?.image_id) ?? imageUrl(g.screenshots?.[0]?.image_id) ?? imageUrl(g.cover?.image_id);
+  if (g.cover?.image_id) return imageUrl(g.cover);
+  const shot = (g.screenshots ?? []).find(
+    (x) => x.image_id && x.width && x.height && x.width >= 960 && x.width / x.height >= 1.4 && x.width / x.height <= 2.4,
+  );
+  return imageUrl(shot);
 }
 
 const yearOf = (unix: number | undefined): number | null => (unix ? new Date(unix * 1000).getUTCFullYear() : null);
@@ -178,7 +198,13 @@ function toDetails(g: IgdbGame) {
   const names = (flag: "developer" | "publisher") => [
     ...new Set(companies.filter((c) => c[flag] && c.company?.name).map((c) => c.company!.name)),
   ];
-  const shots = (g.screenshots ?? []).map((s) => imageUrl(s.image_id)).filter((u): u is string => !!u);
+  // Gallery = real screenshots first (extreme shapes dropped), then promo art that looks right in a wide frame.
+  // The cover itself is never taken from here: it is always the official cover (see bestImage).
+  const shots = (g.screenshots ?? []).filter((x) => !x.width || !x.height || (x.width / x.height >= 1.1 && x.width / x.height <= 2.6));
+  const promo = (g.artworks ?? []).filter(
+    (x) => x.image_id && x.alpha_channel !== true && !!x.width && !!x.height && x.width >= 960 && x.width / x.height >= 1.4 && x.width / x.height <= 2.4,
+  );
+  const gallery = [...new Set([...shots.slice(0, 6), ...promo.slice(0, 4)].map((x) => imageUrl(x)).filter((u): u is string => !!u))];
   return {
     ...toSummary(g),
     released: g.first_release_date ? new Date(g.first_release_date * 1000).toISOString().slice(0, 10) : null,
@@ -186,7 +212,7 @@ function toDetails(g: IgdbGame) {
     developers: names("developer"),
     publishers: names("publisher"),
     website: officialSite(g),
-    screenshots: shots.slice(0, 6),
+    screenshots: gallery.slice(0, 8),
   };
 }
 
@@ -440,16 +466,16 @@ async function igdb<T>(userId: string | null, endpoint: string, body: string): P
   throw new Error("igdb_error");
 }
 
-let websiteVariant = 0; // index into WEBSITE_VARIANTS that IGDB accepted last time
+let detailVariant = 0; // index into DETAIL_EXTRAS that IGDB accepted last time
 
 async function fetchDetails(userId: string | null, id: number): Promise<IgdbGame | null> {
-  for (let i = websiteVariant; i < WEBSITE_VARIANTS.length; i++) {
+  for (let i = detailVariant; i < DETAIL_EXTRAS.length; i++) {
     try {
-      const rows = await igdb<IgdbGame[]>(userId, "games", `fields ${DETAIL_FIELDS}${WEBSITE_VARIANTS[i]}; where id = ${id};`);
-      websiteVariant = i;
+      const rows = await igdb<IgdbGame[]>(userId, "games", `fields ${DETAIL_FIELDS}${DETAIL_EXTRAS[i]}; where id = ${id};`);
+      detailVariant = i;
       return rows[0] ?? null;
     } catch (e) {
-      if (e instanceof Error && e.message.startsWith("bad_query") && i < WEBSITE_VARIANTS.length - 1) continue;
+      if (e instanceof Error && e.message.startsWith("bad_query") && i < DETAIL_EXTRAS.length - 1) continue;
       throw e;
     }
   }
@@ -572,6 +598,17 @@ Deno.serve(async (req) => {
       return json({ game });
     } catch (e) {
       return json({ game: null, error: errorCode(e) });
+    }
+  }
+
+  if (action === "images") {
+    const ids = Array.isArray(body["ids"]) ? (body["ids"] as unknown[]) : null;
+    if (!ids || ids.length === 0 || ids.length > 50 || !ids.every((x) => validId(x) !== null)) return json({ error: "bad_request" }, 400);
+    try {
+      const rows = await igdb<IgdbGame[]>(userId, "games", `fields ${LIST_FIELDS}; where id = (${ids.join(",")}); limit 50;`);
+      return json({ images: rows.map((g) => ({ id: g.id, cover: bestImage(g) })) });
+    } catch (e) {
+      return json({ images: [], error: errorCode(e) });
     }
   }
 

@@ -24,8 +24,8 @@ function formatDate(d: string | null) {
 /** 3:2 cover with the bottom fade used on the web cards. */
 function CardCover({ src, children }: { src: string | null; children?: React.ReactNode }) {
   return (
-    <View style={{ aspectRatio: 3 / 2, overflow: "hidden" }}>
-      <GameCover src={src} w={420} style={StyleSheet.absoluteFill} />
+    <View style={{ aspectRatio: 3 / 4, overflow: "hidden" }}>
+      <GameCover src={src} w={420} tall style={StyleSheet.absoluteFill} />
       <LinearGradient
         colors={["transparent", alpha(colors.background, 0.8)]}
         style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "55%" }}
@@ -92,7 +92,7 @@ export function SearchGameCard({
 export function GameCardSkeleton() {
   return (
     <View style={styles.card}>
-      <Skeleton width="100%" style={{ aspectRatio: 3 / 2 }} radius={0} />
+      <Skeleton width="100%" style={{ aspectRatio: 3 / 4 }} radius={0} />
       <View style={{ padding: 12, gap: 8 }}>
         <Skeleton width="75%" height={16} />
         <Skeleton width="25%" height={12} />

@@ -62,7 +62,7 @@ export default function BibliotecaScreen() {
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
           {Array.from({ length: 6 }).map((_, i) => (
             <View key={i} style={{ width: "48%", borderRadius: radius.xl, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}>
-              <Skeleton width="100%" style={{ aspectRatio: 3 / 2 }} radius={0} />
+              <Skeleton width="100%" style={{ aspectRatio: 3 / 4 }} radius={0} />
               <View style={{ padding: 12, gap: 8 }}>
                 <Skeleton width="75%" height={16} />
                 <Skeleton width="50%" height={12} />

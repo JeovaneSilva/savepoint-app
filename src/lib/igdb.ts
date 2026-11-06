@@ -62,3 +62,12 @@ export async function matchGames(items: MatchItem[]): Promise<{ results: MatchRe
   if (error || !data) return { results: [], error: "unavailable" };
   return data;
 }
+
+/** Best image for up to 50 saved games (one IGDB request). Used to refresh covers chosen by older rules. */
+export async function fetchCovers(ids: number[]): Promise<{ id: number; cover: string | null }[]> {
+  const { data, error } = await supabase.functions.invoke<{ images?: { id: number; cover: string | null }[] }>("igdb", {
+    body: { action: "images", ids },
+  });
+  if (error || !data?.images) return [];
+  return data.images;
+}
