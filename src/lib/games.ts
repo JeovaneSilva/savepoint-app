@@ -28,6 +28,8 @@ export interface GameSummary {
   name: string;
   cover: string | null;
   year: number | null;
+  /** Release date (YYYY-MM-DD), when IGDB has it. */
+  released: string | null;
   platforms: string[];
   /** Short platform labels shown as chips (PS5, PC, SNES...). */
   parentPlatforms: string[];
@@ -36,13 +38,41 @@ export interface GameSummary {
   criticScore: number | null;
 }
 
+/** Average hours to beat a game (IGDB "time to beat"); any of the three can be missing. */
+export interface TimeToBeat {
+  rushed: number | null;
+  normal: number | null;
+  complete: number | null;
+  /** How many players the average comes from (0 = unknown). */
+  count: number;
+}
+
 export interface GameDetails extends GameSummary {
-  released: string | null;
   description: string;
   developers: string[];
   publishers: string[];
   website: string | null;
   screenshots: string[];
+  timeToBeat: TimeToBeat | null;
+  /** Other games of the same series, oldest first. */
+  series: GameSummary[];
+  /** Similar games (not in the series). */
+  similar: GameSummary[];
+}
+
+/** "12" / "12,5" + "h". */
+export const formatHours = (h: number): string => `${String(h).replace(".", ",")}h`;
+
+/** The hours suggested for the "hours to finish" field: the usual way to beat it, else the closest number IGDB has. */
+export function suggestedHours(t: TimeToBeat | null | undefined): number | null {
+  return t ? (t.normal ?? t.rushed ?? t.complete ?? null) : null;
+}
+
+/** Has this release date (YYYY-MM-DD) not happened yet? */
+export function isUnreleased(released: string | null | undefined, today = new Date()): boolean {
+  if (!released) return false;
+  const tz = today.getTimezoneOffset() * 60000;
+  return released > new Date(today.getTime() - tz).toISOString().slice(0, 10);
 }
 
 export type PlatformGroup = "pc" | "playstation" | "xbox" | "nintendo" | "retro";
@@ -57,9 +87,89 @@ export const PLATFORM_GROUPS: { value: PlatformGroup; label: string }[] = [
 
 export const DECADES = [1970, 1980, 1990, 2000, 2010, 2020] as const;
 
+/** Genres offered in the search filter (IGDB genre ids). */
+export const GENRE_FILTERS: { id: number; label: string }[] = [
+  { id: 12, label: "RPG" },
+  { id: 31, label: "Aventura" },
+  { id: 5, label: "Tiro" },
+  { id: 8, label: "Plataforma" },
+  { id: 4, label: "Luta" },
+  { id: 10, label: "Corrida" },
+  { id: 14, label: "Esportes" },
+  { id: 13, label: "Simulação" },
+  { id: 15, label: "Estratégia" },
+  { id: 16, label: "Estratégia por turnos" },
+  { id: 11, label: "Estratégia em tempo real" },
+  { id: 24, label: "Tático" },
+  { id: 25, label: "Hack and slash" },
+  { id: 9, label: "Quebra-cabeça" },
+  { id: 33, label: "Arcade" },
+  { id: 32, label: "Indie" },
+  { id: 34, label: "Visual novel" },
+  { id: 2, label: "Point-and-click" },
+  { id: 7, label: "Música" },
+  { id: 35, label: "Cartas e tabuleiro" },
+  { id: 26, label: "Quiz" },
+  { id: 30, label: "Pinball" },
+];
+
+/** Specific platforms per group, for the second filter (IGDB platform ids; PC has only one). */
+export const PLATFORM_CHOICES: Partial<Record<PlatformGroup, { id: number; label: string }[]>> = {
+  playstation: [
+    { id: 167, label: "PlayStation 5" },
+    { id: 48, label: "PlayStation 4" },
+    { id: 9, label: "PlayStation 3" },
+    { id: 8, label: "PlayStation 2" },
+    { id: 7, label: "PlayStation" },
+    { id: 38, label: "PSP" },
+    { id: 46, label: "PS Vita" },
+  ],
+  xbox: [
+    { id: 169, label: "Xbox Series X|S" },
+    { id: 49, label: "Xbox One" },
+    { id: 12, label: "Xbox 360" },
+    { id: 11, label: "Xbox" },
+  ],
+  nintendo: [
+    { id: 508, label: "Switch 2" },
+    { id: 130, label: "Switch" },
+    { id: 41, label: "Wii U" },
+    { id: 5, label: "Wii" },
+    { id: 37, label: "3DS" },
+    { id: 20, label: "DS" },
+    { id: 21, label: "GameCube" },
+    { id: 4, label: "Nintendo 64" },
+    { id: 19, label: "Super Nintendo" },
+    { id: 18, label: "NES" },
+    { id: 24, label: "Game Boy Advance" },
+    { id: 22, label: "Game Boy Color" },
+    { id: 33, label: "Game Boy" },
+  ],
+  retro: [
+    { id: 18, label: "NES" },
+    { id: 19, label: "Super Nintendo" },
+    { id: 4, label: "Nintendo 64" },
+    { id: 33, label: "Game Boy" },
+    { id: 24, label: "Game Boy Advance" },
+    { id: 7, label: "PlayStation" },
+    { id: 8, label: "PlayStation 2" },
+    { id: 29, label: "Mega Drive/Genesis" },
+    { id: 64, label: "Master System" },
+    { id: 35, label: "Game Gear" },
+    { id: 32, label: "Saturn" },
+    { id: 23, label: "Dreamcast" },
+    { id: 59, label: "Atari 2600" },
+    { id: 15, label: "Commodore 64" },
+    { id: 16, label: "Amiga" },
+  ],
+};
+
 export interface SearchFilters {
   search: string;
   platform?: PlatformGroup | null | undefined;
+  platformId?: number | null | undefined;
+  genre?: number | null | undefined;
+  upcoming?: boolean | undefined;
   decade?: number | null | undefined;
   page: number;
 }

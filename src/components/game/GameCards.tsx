@@ -11,7 +11,7 @@ import { RemoveGameButton } from "./RemoveGameButton";
 import { StarRating } from "./StarRating";
 import { StatusBadge } from "./StatusBadge";
 import { alpha, colors, radius, shadowCard } from "@/theme";
-import type { GameStatus, GameSummary, UserGame } from "@/lib/games";
+import { isUnreleased, type GameStatus, type GameSummary, type UserGame } from "@/lib/games";
 
 const openGame = (igdbId: number) => router.push({ pathname: "/jogo/[id]", params: { id: String(igdbId) } });
 
@@ -46,6 +46,7 @@ export function SearchGameCard({
   entry?: UserGame | undefined;
   onAdd: (game: GameSummary, status: GameStatus) => void;
 }) {
+  const unreleased = isUnreleased(game.released);
   return (
     <View style={styles.card}>
       <Pressable onPress={() => openGame(game.id)} accessibilityLabel={`Ver ${game.name}`}>
@@ -64,9 +65,13 @@ export function SearchGameCard({
         <Text weight="semibold" numberOfLines={2} onPress={() => openGame(game.id)} style={{ fontSize: 14, lineHeight: 19 }}>
           {game.name}
         </Text>
-        <Text muted style={{ fontSize: 12 }}>
-          {game.year ? String(game.year) : "—"}
-        </Text>
+        {unreleased && game.released ? (
+          <Text weight="medium" style={{ fontSize: 12, color: colors.accent }}>{`Lança em ${formatDate(game.released)}`}</Text>
+        ) : (
+          <Text muted style={{ fontSize: 12 }}>
+            {game.year ? String(game.year) : "—"}
+          </Text>
+        )}
         <PlatformIcons slugs={game.parentPlatforms} max={4} />
         <View style={{ marginTop: "auto", paddingTop: 4, gap: 6 }}>
           {entry ? (
@@ -75,9 +80,11 @@ export function SearchGameCard({
             </Text>
           ) : (
             <>
-              <Button size="sm" variant="done" fullWidth icon={<Trophy size={14} color={colors.statusDone} />} onPress={() => onAdd(game, "concluido")}>
-                Já zerei
-              </Button>
+              {!unreleased && (
+                <Button size="sm" variant="done" fullWidth icon={<Trophy size={14} color={colors.statusDone} />} onPress={() => onAdd(game, "concluido")}>
+                  Já zerei
+                </Button>
+              )}
               <Button size="sm" variant="want" fullWidth icon={<Bookmark size={14} color={colors.statusWant} />} onPress={() => onAdd(game, "quero_jogar")}>
                 Quero jogar
               </Button>

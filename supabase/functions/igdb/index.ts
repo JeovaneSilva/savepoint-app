@@ -26,8 +26,8 @@ const USER_HOURLY_LIMIT = Number(Deno.env.get("IGDB_USER_HOURLY_LIMIT") ?? Deno.
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 /** Bump when the shape of cached answers changes, so older cached copies are ignored. */
-const CACHE_V = "v6";
-const TTL = { trending: 6 * HOUR, search: DAY, game: 30 * DAY, find: 30 * DAY };
+const CACHE_V = "v7";
+const TTL = { trending: 6 * HOUR, search: DAY, game: 30 * DAY, find: 30 * DAY, extras: 7 * DAY };
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -55,7 +55,15 @@ interface IgdbGame {
   summary?: string;
   involved_companies?: { developer?: boolean; publisher?: boolean; company?: { name: string } }[];
   websites?: { url?: string; category?: number }[];
+  collections?: number[]; // series ids (details only)
+  similar_games?: number[]; // ids of similar games (details only)
 }
+
+/** Seconds, as IGDB stores them (endpoint game_time_to_beats). */
+interface IgdbTimeToBeat { hastily?: number; normally?: number; completely?: number; count?: number }
+
+/** Things fetched apart from the game itself: how long it takes to beat, its series and similar games. */
+interface DetailExtras { timeToBeat?: IgdbTimeToBeat | null; series?: IgdbGame[]; similar?: IgdbGame[] }
 
 type PlatformGroup = "pc" | "playstation" | "xbox" | "nintendo" | "retro";
 
@@ -70,6 +78,10 @@ const PLATFORM_IDS: Record<PlatformGroup, number[]> = {
   retro: [59, 66, 60, 18, 19, 4, 33, 22, 24, 21, 7, 8, 11, 64, 29, 35, 32, 23, 80, 79, 15, 16],
 };
 const DECADES = [1970, 1980, 1990, 2000, 2010, 2020];
+/** Every platform id the app can filter by (the group lists above). */
+const ALL_PLATFORM_IDS = new Set(Object.values(PLATFORM_IDS).flat());
+/** IGDB genre ids the app can filter by. */
+const GENRE_IDS = new Set([2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 24, 25, 26, 30, 31, 32, 33, 34, 35]);
 
 const PAGE_SIZE = 12;
 const LIST_FIELDS =
@@ -80,7 +92,10 @@ const DETAIL_FIELDS =
 const WEBSITE_VARIANTS = [",websites.url,websites.category", ",websites.url", ""];
 /** Promo art for the gallery (never for the cover). alpha_channel marks logos/cut-outs, which are left out. */
 const ART_FIELDS = ",artworks.image_id,artworks.width,artworks.height,artworks.alpha_channel";
-const DETAIL_EXTRAS = [...WEBSITE_VARIANTS.map((w) => ART_FIELDS + w), ...WEBSITE_VARIANTS];
+const BASE_EXTRAS = [...WEBSITE_VARIANTS.map((w) => ART_FIELDS + w), ...WEBSITE_VARIANTS];
+/** Series and similar games (ids only). If IGDB rejects them the details still load, just without those sections. */
+const REL_VARIANTS = [",collections,similar_games", ",similar_games", ""];
+const DETAIL_EXTRAS = REL_VARIANTS.flatMap((r) => BASE_EXTRAS.map((b) => r + b));
 
 /** Names shown in the app: keep the short ones the library already uses (the ones the library already uses). */
 const DISPLAY_PLATFORM: Record<string, string> = {
@@ -167,6 +182,24 @@ function bestImage(g: IgdbGame): string | null {
 }
 
 const yearOf = (unix: number | undefined): number | null => (unix ? new Date(unix * 1000).getUTCFullYear() : null);
+const isoDate = (unix: number | undefined): string | null => (unix ? new Date(unix * 1000).toISOString().slice(0, 10) : null);
+
+/** Seconds -> hours in half-hour steps (never 0). */
+const toHours = (sec: number | undefined): number | null =>
+  typeof sec === "number" && sec > 0 ? Math.max(0.5, Math.round(sec / 1800) / 2) : null;
+
+/** Average time to beat. Null when IGDB has no usable numbers. */
+function timeToBeatOf(t: IgdbTimeToBeat | null | undefined) {
+  if (!t) return null;
+  const rushed = toHours(t.hastily);
+  const normal = toHours(t.normally);
+  const complete = toHours(t.completely);
+  if (rushed === null && normal === null && complete === null) return null;
+  return { rushed, normal, complete, count: typeof t.count === "number" ? t.count : 0 };
+}
+
+const byReleaseAsc = (a: IgdbGame, b: IgdbGame) => (a.first_release_date ?? Infinity) - (b.first_release_date ?? Infinity);
+const byPopularity = (a: IgdbGame, b: IgdbGame) => (b.total_rating_count ?? 0) - (a.total_rating_count ?? 0);
 
 function toSummary(g: IgdbGame) {
   const ordered = sortedPlatforms(g);
@@ -177,6 +210,7 @@ function toSummary(g: IgdbGame) {
     name: g.name,
     cover: bestImage(g),
     year: yearOf(g.first_release_date),
+    released: isoDate(g.first_release_date),
     platforms,
     parentPlatforms: badges, // short labels shown as chips (PS5, PC, SNES...)
     genres: [...new Set((g.genres ?? []).map((x) => displayGenre(x.name)))],
@@ -193,7 +227,7 @@ function officialSite(g: IgdbGame): string | null {
   return sites.find((w) => w.url && !NOT_OFFICIAL.test(w.url))?.url ?? null;
 }
 
-function toDetails(g: IgdbGame) {
+function toDetails(g: IgdbGame, extra: DetailExtras = {}) {
   const companies = g.involved_companies ?? [];
   const names = (flag: "developer" | "publisher") => [
     ...new Set(companies.filter((c) => c[flag] && c.company?.name).map((c) => c.company!.name)),
@@ -204,6 +238,12 @@ function toDetails(g: IgdbGame) {
   const promo = (g.artworks ?? []).filter(
     (x) => x.image_id && x.alpha_channel !== true && !!x.width && !!x.height && x.width >= 960 && x.width / x.height >= 1.4 && x.width / x.height <= 2.4,
   );
+  const series = (extra.series ?? []).filter((x) => x.id !== g.id && !!x.name).sort(byReleaseAsc).slice(0, 12);
+  const inSeries = new Set(series.map((x) => x.id));
+  const similar = (extra.similar ?? [])
+    .filter((x) => x.id !== g.id && !inSeries.has(x.id) && !!x.name)
+    .sort(byPopularity)
+    .slice(0, 12);
   const gallery = [...new Set([...shots.slice(0, 6), ...promo.slice(0, 4)].map((x) => imageUrl(x)).filter((u): u is string => !!u))];
   return {
     ...toSummary(g),
@@ -213,6 +253,9 @@ function toDetails(g: IgdbGame) {
     publishers: names("publisher"),
     website: officialSite(g),
     screenshots: gallery.slice(0, 8),
+    timeToBeat: timeToBeatOf(extra.timeToBeat),
+    series: series.map(toSummary),
+    similar: similar.map(toSummary),
   };
 }
 
@@ -225,39 +268,57 @@ interface ListFilters {
   platform: PlatformGroup | null;
   decade: number | null;
   page: number;
+  /** One specific platform (overrides the group). */
+  platformId?: number | null;
+  genre?: number | null;
+  /** Games that have not been released yet, soonest first. */
+  upcoming?: boolean;
 }
 
 /**
- * Search by name, or (no search) a popular-games list. Without a search or decade the list is "trending":
- * games released in the last 12 months, ranked by how many people rated them. Trending is a single page.
+ * Search by name, or (no search) a popular-games list. The plain list with no filters at all is "em alta": games released
+ * in the last 12 months, ranked by how many people rated them, a single page (`single`). With any filter the list is the
+ * most rated games that match, with pages. "Em breve" lists unreleased games people follow, soonest first.
+ * `trending` = "no name search" (cached shorter); `single` = one page only.
  */
-function buildListQuery(f: ListFilters, nowMs: number): { body: string; trending: boolean } {
+function buildListQuery(f: ListFilters, nowMs: number, opts: { hypes?: boolean } = {}): { body: string; trending: boolean; single: boolean } {
   const day = Math.floor(nowMs / 86_400_000) * 86_400; // rounded to the day so the cache key stays stable
   const term = f.search.trim();
   const searching = term.length >= 2;
+  const upcoming = f.upcoming === true;
 
   const where = ["parent_game = null", "version_parent = null"];
-  if (f.platform) where.push(`platforms = (${PLATFORM_IDS[f.platform].join(",")})`);
-  if (f.decade) {
+  if (f.platformId) where.push(`platforms = (${f.platformId})`);
+  else if (f.platform) where.push(`platforms = (${PLATFORM_IDS[f.platform].join(",")})`);
+  if (f.genre) where.push(`genres = (${f.genre})`);
+  if (upcoming) {
+    where.push(`first_release_date > ${day}`);
+  } else if (f.decade) {
     where.push(`first_release_date >= ${Date.UTC(f.decade, 0, 1) / 1000}`);
     where.push(`first_release_date <= ${Date.UTC(f.decade + 9, 11, 31, 23, 59, 59) / 1000}`);
   }
+  const windowed = !searching && !upcoming && !f.decade && !f.platformId && !f.genre && f.platform !== "retro";
   if (!searching) {
-    where.push("total_rating_count != null");
-    if (!f.decade && f.platform !== "retro") {
-      where.push(`first_release_date >= ${day - 365 * 86_400}`, `first_release_date <= ${day}`);
+    if (upcoming) {
+      where.push(`first_release_date <= ${day + 2 * 365 * 86_400}`);
+      if (opts.hypes !== false) where.push("hypes >= 3");
+    } else {
+      where.push("total_rating_count != null");
+      if (windowed) where.push(`first_release_date >= ${day - 365 * 86_400}`, `first_release_date <= ${day}`);
     }
   }
 
+  const single = windowed;
+  const sort = searching ? "" : upcoming ? "sort first_release_date asc;" : "sort total_rating_count desc;";
   const parts = [
     searching ? `search "${esc(term)}";` : "",
     `fields ${LIST_FIELDS};`,
     `where ${where.join(" & ")};`,
-    searching ? "" : "sort total_rating_count desc;",
-    `limit ${searching ? PAGE_SIZE + 1 : PAGE_SIZE};`, // one extra row tells us if there is a next page
-    `offset ${searching ? (Math.max(1, f.page) - 1) * PAGE_SIZE : 0};`,
+    sort, // IGDB does not allow "sort" together with "search"
+    `limit ${single ? PAGE_SIZE : PAGE_SIZE + 1};`, // one extra row tells us if there is a next page
+    `offset ${single ? 0 : (Math.max(1, f.page) - 1) * PAGE_SIZE};`,
   ];
-  return { body: parts.filter(Boolean).join(" "), trending: !searching };
+  return { body: parts.filter(Boolean).join(" "), trending: !searching, single };
 }
 
 /* ---------- matching a game from an old export file (it only has the RAWG id and a title) to its IGDB game ---------- */
@@ -330,12 +391,26 @@ function parseFilters(body: Record<string, unknown>): ListFilters | null {
   const platform = body["platform"] ?? null;
   const decade = body["decade"] ?? null;
   const page = body["page"] ?? 1;
+  const platformId = body["platformId"] ?? null;
+  const genre = body["genre"] ?? null;
+  const upcoming = body["upcoming"] ?? false;
+  if (platformId !== null && !(typeof platformId === "number" && ALL_PLATFORM_IDS.has(platformId))) return null;
+  if (genre !== null && !(typeof genre === "number" && GENRE_IDS.has(genre))) return null;
+  if (typeof upcoming !== "boolean") return null;
   if (search.length > 100 || /[\u0000-\u001f]/.test(search)) return null;
   if (search.trim() !== "" && search.trim().length < 2) return null;
   if (platform !== null && !(typeof platform === "string" && platform in PLATFORM_IDS)) return null;
   if (decade !== null && !(typeof decade === "number" && DECADES.includes(decade))) return null;
   if (!(typeof page === "number" && Number.isInteger(page) && page >= 1 && page <= 50)) return null;
-  return { search, platform: platform as PlatformGroup | null, decade: decade as number | null, page };
+  return {
+    search,
+    platform: platform as PlatformGroup | null,
+    decade: decade as number | null,
+    page,
+    platformId: platformId as number | null,
+    genre: genre as number | null,
+    upcoming,
+  };
 }
 
 const validId = (v: unknown): number | null => (typeof v === "number" && Number.isInteger(v) && v > 0 && v < 100_000_000 ? v : null);
@@ -482,6 +557,57 @@ async function fetchDetails(userId: string | null, id: number): Promise<IgdbGame
   return null;
 }
 
+/**
+ * Time to beat, series and similar games. A failed part is left out; if the failure looks temporary (not IGDB refusing
+ * the query) the whole thing throws so it is neither cached nor saved, and the next opening tries again.
+ */
+async function fetchExtras(userId: string | null, g: IgdbGame): Promise<DetailExtras> {
+  let transient = false;
+  const safe = async <T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await run();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (e instanceof RateLimitError) throw e;
+      if (!msg.startsWith("bad_query")) transient = true;
+      console.warn(`[igdb] extras (${label}) skipped:`, msg.slice(0, 200));
+      return fallback;
+    }
+  };
+
+  const ids = (g.similar_games ?? []).filter((x) => validId(x) !== null).slice(0, 20);
+  const collections = (g.collections ?? []).filter((x) => validId(x) !== null).slice(0, 5);
+
+  const [ttb, series, similar] = await Promise.all([
+    safe(
+      "time_to_beat",
+      async () => (await igdb<(IgdbTimeToBeat & { game_id?: number })[]>(userId, "game_time_to_beats", `fields hastily,normally,completely,count,game_id; where game_id = ${g.id}; limit 1;`))[0] ?? null,
+      null as IgdbTimeToBeat | null,
+    ),
+    collections.length
+      ? safe(
+          "series",
+          () =>
+            igdb<IgdbGame[]>(
+              userId,
+              "games",
+              `fields ${LIST_FIELDS}; where collections = (${collections.join(",")}) & id != ${g.id} & parent_game = null & version_parent = null & total_rating_count != null; sort total_rating_count desc; limit 12;`,
+            ),
+          [] as IgdbGame[],
+        )
+      : Promise.resolve([] as IgdbGame[]),
+    ids.length
+      ? safe(
+          "similar",
+          () => igdb<IgdbGame[]>(userId, "games", `fields ${LIST_FIELDS}; where id = (${ids.join(",")}) & parent_game = null & version_parent = null; limit 20;`),
+          [] as IgdbGame[],
+        )
+      : Promise.resolve([] as IgdbGame[]),
+  ]);
+  if (transient) throw new Error("igdb_error");
+  return { timeToBeat: ttb, series, similar };
+}
+
 /** Candidates for a title (cached): used by the importer and the migration. */
 async function findCandidates(userId: string | null, name: string): Promise<Candidate[]> {
   const key = `igdb:${CACHE_V}:find:${normalizeTitle(name)}`;
@@ -576,10 +702,17 @@ Deno.serve(async (req) => {
     const q = buildListQuery(f, Date.now());
     try {
       const res = await cached(`igdb:${CACHE_V}:search:${q.body}`, q.trending ? TTL.trending : TTL.search, async () => {
-        const rows = await igdb<IgdbGame[]>(userId, "games", q.body);
+        let rows: IgdbGame[];
+        try {
+          rows = await igdb<IgdbGame[]>(userId, "games", q.body);
+        } catch (e) {
+          // "hypes" is only used to keep obscure unreleased games out; if IGDB refuses it, list without it.
+          if (!(f.upcoming && e instanceof Error && e.message.startsWith("bad_query"))) throw e;
+          rows = await igdb<IgdbGame[]>(userId, "games", buildListQuery(f, Date.now(), { hypes: false }).body);
+        }
         return { results: rows.slice(0, PAGE_SIZE).map(toSummary), hasMore: rows.length > PAGE_SIZE };
       });
-      return json({ results: res.results, hasMore: !q.trending && res.hasMore, count: res.results.length });
+      return json({ results: res.results, hasMore: !q.single && res.hasMore, count: res.results.length });
     } catch (e) {
       const error = errorCode(e);
       return json({ results: [], hasMore: false, count: 0, error: error === "not_found" ? "unavailable" : error });
@@ -590,12 +723,19 @@ Deno.serve(async (req) => {
     const id = validId(body["id"]);
     if (id === null) return json({ error: "bad_request" }, 400);
     try {
-      const game = await cached(`igdb:${CACHE_V}:game:${id}`, TTL.game, async () => {
+      const raw = await cached(`igdb:${CACHE_V}:game:${id}`, TTL.game, async () => {
         const g = await fetchDetails(userId, id);
         if (!g) throw new Error("not_found");
-        return toDetails(g);
+        return g;
       });
-      return json({ game });
+      // Time to beat, series and similar games: if they fail the game still opens, and the next opening tries again.
+      let extra: DetailExtras = {};
+      try {
+        extra = await cached(`igdb:${CACHE_V}:extras:${id}`, TTL.extras, () => fetchExtras(userId, raw));
+      } catch {
+        /* left out this time */
+      }
+      return json({ game: toDetails(raw, extra) });
     } catch (e) {
       return json({ game: null, error: errorCode(e) });
     }

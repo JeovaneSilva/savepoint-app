@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, FlatList, View } from "react-native";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
-import { Flame, Ghost, KeyRound, Search, X } from "lucide-react-native";
+import { CalendarClock, Flame, Ghost, KeyRound, Search, SlidersHorizontal, X } from "lucide-react-native";
 import { Backdrop } from "@/components/Screen";
 import { EmptyState, DataAttribution } from "@/components/Brand";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +14,16 @@ import { GameEntryDialog, type EntryTarget } from "@/components/game/GameEntryDi
 import { useDebounced } from "@/hooks/use-debounced";
 import { useLibraryMap } from "@/hooks/use-library";
 import { searchGames } from "@/lib/igdb";
-import { DECADES, PLATFORM_GROUPS, TRENDING_SIZE, effectiveSearch, type GameSummary, type PlatformGroup } from "@/lib/games";
+import {
+  DECADES,
+  GENRE_FILTERS,
+  PLATFORM_CHOICES,
+  PLATFORM_GROUPS,
+  TRENDING_SIZE,
+  effectiveSearch,
+  type GameSummary,
+  type PlatformGroup,
+} from "@/lib/games";
 import { colors } from "@/theme";
 
 type Item = GameSummary | { skeleton: number };
@@ -23,16 +32,21 @@ const isSkeleton = (i: Item): i is { skeleton: number } => "skeleton" in i;
 export default function BuscarScreen() {
   const [term, setTerm] = useState("");
   const [platform, setPlatform] = useState<PlatformGroup | null>(null);
+  const [platformId, setPlatformId] = useState<number | null>(null);
+  const [genre, setGenre] = useState<number | null>(null);
   const [decade, setDecade] = useState<number | null>(null);
+  const [upcoming, setUpcoming] = useState(false);
   const [target, setTarget] = useState<EntryTarget | null>(null);
   const search = effectiveSearch(useDebounced(term, 400));
   const trending = !search;
+  const hasFilters = !!(platform || platformId || genre || (decade && !upcoming));
+  const choices = platform ? (PLATFORM_CHOICES[platform] ?? []) : [];
   const library = useLibraryMap();
 
   const q = useInfiniteQuery({
-    queryKey: ["game-search", search, platform, decade],
+    queryKey: ["game-search", search, platform, platformId, genre, decade, upcoming],
     initialPageParam: 1,
-    queryFn: ({ pageParam }) => searchGames({ search, platform, decade, page: pageParam }),
+    queryFn: ({ pageParam }) => searchGames({ search, platform, platformId, genre, decade: upcoming ? null : decade, upcoming, page: pageParam }),
     getNextPageParam: (last, all) => (last.hasMore && !last.error ? all.length + 1 : undefined),
     staleTime: 10 * 60_000,
     // Keep showing the previous results while the next search loads (no skeleton flash).
@@ -55,7 +69,21 @@ export default function BuscarScreen() {
       <View>
         <H1>Buscar jogos</H1>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-          {trending ? (
+          {trending && upcoming ? (
+            <>
+              <CalendarClock size={16} color={colors.accent} />
+              <Text muted style={{ fontSize: 15 }}>
+                Próximos lançamentos mais aguardados
+              </Text>
+            </>
+          ) : trending && hasFilters ? (
+            <>
+              <SlidersHorizontal size={16} color={colors.accent} />
+              <Text muted style={{ fontSize: 15 }}>
+                Mais populares com esses filtros
+              </Text>
+            </>
+          ) : trending ? (
             <>
               <Flame size={16} color={colors.accent} />
               <Text muted style={{ fontSize: 15 }}>
@@ -88,21 +116,56 @@ export default function BuscarScreen() {
 
       <View style={{ marginHorizontal: -16 }}>
         <Chips
+          value={upcoming ? "upcoming" : "popular"}
+          onChange={(v) => setUpcoming(v === "upcoming")}
+          items={[
+            { value: "popular", label: "Populares" },
+            { value: "upcoming", label: "Em breve" },
+          ]}
+        />
+      </View>
+
+      <View style={{ marginHorizontal: -16 }}>
+        <Chips
           value={platform ?? "all"}
-          onChange={(v) => setPlatform(v === "all" ? null : (v as PlatformGroup))}
+          onChange={(v) => {
+            setPlatform(v === "all" ? null : (v as PlatformGroup));
+            setPlatformId(null); // the specific platform belongs to the group that was chosen
+          }}
           items={[{ value: "all", label: "Todas" }, ...PLATFORM_GROUPS.map((p) => ({ value: p.value as string, label: p.label }))]}
         />
       </View>
 
-      <Select
-        title="Década"
-        value={decade ? String(decade) : "all"}
-        onChange={(v) => setDecade(v === "all" ? null : Number(v))}
-        options={[
-          { value: "all", label: "Qualquer década" },
-          ...DECADES.map((d) => ({ value: String(d), label: `Anos ${String(d).slice(2)}` })),
-        ]}
-      />
+      {choices.length > 0 && (
+        <Select
+          title="Plataforma"
+          value={platformId ? String(platformId) : "all"}
+          onChange={(v) => setPlatformId(v === "all" ? null : Number(v))}
+          options={[{ value: "all", label: "Todas desta família" }, ...choices.map((c) => ({ value: String(c.id), label: c.label }))]}
+        />
+      )}
+
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <Select
+          title="Gênero"
+          style={{ flex: 1 }}
+          value={genre ? String(genre) : "all"}
+          onChange={(v) => setGenre(v === "all" ? null : Number(v))}
+          options={[{ value: "all", label: "Qualquer gênero" }, ...GENRE_FILTERS.map((g) => ({ value: String(g.id), label: g.label }))]}
+        />
+        {!upcoming && (
+          <Select
+            title="Década"
+            style={{ flex: 1 }}
+            value={decade ? String(decade) : "all"}
+            onChange={(v) => setDecade(v === "all" ? null : Number(v))}
+            options={[
+              { value: "all", label: "Qualquer década" },
+              ...DECADES.map((d) => ({ value: String(d), label: `Anos ${String(d).slice(2)}` })),
+            ]}
+          />
+        )}
+      </View>
 
       {error === "missing_key" ? (
         <EmptyState
@@ -136,7 +199,7 @@ export default function BuscarScreen() {
         <EmptyState
           icon={<Ghost size={40} color={colors.mutedForeground} />}
           title="Nenhum jogo encontrado"
-          text="Tente outro nome ou remova os filtros de plataforma e década."
+          text={upcoming ? "Nenhum lançamento encontrado com esses filtros. Tente remover algum." : "Tente outro nome ou remova os filtros."}
         />
       ) : null}
     </View>

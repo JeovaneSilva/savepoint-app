@@ -9,7 +9,7 @@ import { Text } from "@/components/ui/Text";
 import { toast } from "@/components/ui/Toast";
 import { StarRating } from "./StarRating";
 import { alpha, colors, radius } from "@/theme";
-import { STATUSES, STATUS_LABEL, type GameStatus } from "@/lib/games";
+import { STATUSES, STATUS_LABEL, formatHours, type GameStatus } from "@/lib/games";
 
 export interface EntryValues {
   status: GameStatus;
@@ -137,12 +137,14 @@ interface Props {
   initial: EntryValues;
   platforms: string[];
   submitLabel: string;
+  /** Average hours to beat the game (IGDB), offered as a one-tap value for the hours field. */
+  suggestedHours?: number | null;
   pending?: boolean;
   onSubmit: (v: EntryValues) => void;
   onCancel?: () => void;
 }
 
-export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubmit, onCancel }: Props) {
+export function GameEntryForm({ initial, platforms, submitLabel, suggestedHours, pending, onSubmit, onCancel }: Props) {
   const [v, setV] = useState<EntryValues>(initial);
   const [hoursText, setHoursText] = useState(hoursToText(initial.hours_played));
   const set = <K extends keyof EntryValues>(k: K, val: EntryValues[K]) => setV((p) => ({ ...p, [k]: val }));
@@ -245,6 +247,16 @@ export function GameEntryForm({ initial, platforms, submitLabel, pending, onSubm
             maxLength={7}
             placeholder="Ex.: 25 ou 12,5"
           />
+          {suggestedHours != null && parseHours(hoursText) !== suggestedHours && (
+            <Pressable
+              onPress={() => setHoursText(hoursToText(suggestedHours))}
+              accessibilityRole="button"
+              accessibilityLabel={`Usar ${formatHours(suggestedHours)} como horas para zerar`}
+              style={{ marginTop: 8, alignSelf: "flex-start", paddingVertical: 4 }}
+            >
+              <Text style={{ fontSize: 13, color: colors.accent }}>{`Tempo médio para zerar: ${formatHours(suggestedHours)} · toque para usar`}</Text>
+            </Pressable>
+          )}
         </View>
       )}
 

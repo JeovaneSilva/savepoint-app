@@ -18,6 +18,11 @@ export type DetailsResponse = {
 export interface SearchParams {
   search: string;
   platform?: PlatformGroup | null | undefined;
+  /** One specific platform (wins over the group). */
+  platformId?: number | null | undefined;
+  genre?: number | null | undefined;
+  /** Unreleased games, soonest first. */
+  upcoming?: boolean | undefined;
   decade?: number | null | undefined;
   page: number;
 }
@@ -25,7 +30,16 @@ export interface SearchParams {
 /** Search games through the `igdb` Edge Function (the Twitch/IGDB credentials stay server-side). */
 export async function searchGames(p: SearchParams): Promise<SearchResponse> {
   const { data, error } = await supabase.functions.invoke<SearchResponse>("igdb", {
-    body: { action: "search", search: p.search, platform: p.platform ?? null, decade: p.decade ?? null, page: p.page },
+    body: {
+      action: "search",
+      search: p.search,
+      platform: p.platform ?? null,
+      platformId: p.platformId ?? null,
+      genre: p.genre ?? null,
+      upcoming: p.upcoming ?? false,
+      decade: p.decade ?? null,
+      page: p.page,
+    },
   });
   if (error || !data) return { results: [], hasMore: false, count: 0, error: "unavailable" };
   return data;

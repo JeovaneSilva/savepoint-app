@@ -14,11 +14,12 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { H2, Text } from "@/components/ui/Text";
 import { GameCover } from "@/components/game/GameCover";
 import { GameEntryForm, type EntryValues } from "@/components/game/GameEntryForm";
+import { RelatedGames } from "@/components/game/RelatedGames";
 import { RemoveGameButton } from "@/components/game/RemoveGameButton";
 import { StatusBadge } from "@/components/game/StatusBadge";
 import { libraryQuery, useAddGame, useUpdateGame } from "@/hooks/use-library";
 import { getGameDetails, type DetailsResponse } from "@/lib/igdb";
-import { IMAGE_VERSION, igdbThumb, type GameDetails, type UserGame } from "@/lib/games";
+import { IMAGE_VERSION, formatHours, igdbThumb, suggestedHours, type GameDetails, type TimeToBeat, type UserGame } from "@/lib/games";
 import { alpha, colors, radius, shadowGlow } from "@/theme";
 
 export default function GameScreen() {
@@ -38,16 +39,19 @@ export default function GameScreen() {
           name: entry.name,
           cover: entry.cover_url,
           year: entry.release_year,
+          released: null,
           platforms: entry.platforms,
           parentPlatforms: [],
           genres: entry.genres,
           criticScore: null,
-          released: null,
           description: "",
           developers: [],
           publishers: [],
           website: null,
           screenshots: [],
+          timeToBeat: null,
+          series: [],
+          similar: [],
         },
       }
     : undefined;
@@ -204,6 +208,8 @@ export default function GameScreen() {
               </Card>
               )}
 
+              {!loadingExtra && <TimeToBeatCard time={g.timeToBeat ?? null} />}
+
               {g.screenshots.length > 0 && (
                 <View style={{ gap: 12 }}>
                   <H2>Screenshots</H2>
@@ -222,6 +228,9 @@ export default function GameScreen() {
                   </View>
                 </View>
               )}
+
+              {!loadingExtra && <RelatedGames title="Da mesma série" games={g.series ?? []} />}
+              {!loadingExtra && <RelatedGames title="Jogos parecidos" games={g.similar ?? []} />}
 
               {/* My data */}
               <View
@@ -256,6 +265,38 @@ export default function GameScreen() {
           </View>
         </Pressable>
       </Modal>
+    </View>
+  );
+}
+
+/** Average hours to beat the game, from IGDB. Hidden when there is no data. */
+function TimeToBeatCard({ time }: { time: TimeToBeat | null }) {
+  if (!time) return null;
+  const cols = [
+    { label: "Rápido", value: time.rushed },
+    { label: "Normal", value: time.normal },
+    { label: "Completo", value: time.complete },
+  ];
+  return (
+    <View style={{ gap: 12 }}>
+      <H2>Tempo para zerar</H2>
+      <Card style={{ gap: 12 }}>
+        <View style={{ flexDirection: "row" }}>
+          {cols.map((c) => (
+            <View key={c.label} style={{ flex: 1, alignItems: "center", gap: 4 }}>
+              <Text display weight="bold" style={{ fontSize: 24, color: c.value != null ? colors.foreground : colors.mutedForeground }}>
+                {c.value != null ? formatHours(c.value) : "—"}
+              </Text>
+              <Text muted weight="semibold" style={styles.infoLabel}>
+                {c.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <Text muted style={{ fontSize: 12, textAlign: "center" }}>
+          {time.count > 0 ? `Média de ${time.count} ${time.count === 1 ? "jogador" : "jogadores"} (IGDB)` : "Média dos jogadores (IGDB)"}
+        </Text>
+      </Card>
     </View>
   );
 }
@@ -301,6 +342,7 @@ function MyDataForm({ game, entry }: { game: GameDetails; entry: UserGame | unde
       initial={initial}
       platforms={game.platforms}
       submitLabel={entry ? "Salvar alterações" : "Adicionar"}
+      suggestedHours={suggestedHours(game.timeToBeat)}
       pending={add.isPending || update.isPending}
       onSubmit={(v) => {
         if (entry) {
